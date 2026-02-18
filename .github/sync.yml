@@ -11,7 +11,7 @@
 #
 # NOT synced (repo-specific):
 #   - .github/dependabot.yml  (different ecosystems per repo)
-#   - .github/CODEOWNERS      (terraform/opencode have custom rules)
+#   - .github/CODEOWNERS      (terraform has custom rules)
 #   - .github/copilot-instructions.md (repo-specific context)
 
 group:
@@ -31,7 +31,6 @@ group:
         dest: .github/workflows/labeler.yml
     repos: |
       qws941/blacklist
-      qws941/claude
       qws941/hycu_fsds
       qws941/propose
       qws941/resume
@@ -47,27 +46,10 @@ group:
         dest: .github/workflows/auto-merge.yml
     repos: |
       qws941/blacklist
-      qws941/claude
       qws941/hycu_fsds
-      qws941/opencode
       qws941/propose
       qws941/resume
       qws941/safework2
       qws941/splunk
       qws941/tmux
       qws941/youtube
-
-  # Group 3: opencode fork — sync governance subset (no LICENSE)
-  - files:
-      - source: OWNERS
-        dest: OWNERS
-      - source: .editorconfig
-        dest: .editorconfig
-      - source: .github/labeler.yml
-        dest: .github/labeler.yml
-      - source: .github/workflows/stale.yml
-        dest: .github/workflows/stale.yml
-      - source: .github/workflows/labeler.yml
-        dest: .github/workflows/labeler.yml
-    repos: |
-      qws941/opencode
