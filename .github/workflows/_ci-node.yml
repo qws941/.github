@@ -1,0 +1,106 @@
+# Reusable Node.js CI Workflow
+# SSoT: qws941/.github — do not duplicate in consuming repos
+#
+# Usage:
+#   jobs:
+#     ci:
+#       uses: qws941/.github/.github/workflows/_ci-node.yml@main
+#       with:
+#         node-version: '20'
+#         turbo: true
+#         run-test: true
+#       secrets: inherit
+
+name: Node.js CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version'
+        required: false
+        type: string
+        default: '20'
+      working-directory:
+        description: 'Working directory for commands'
+        required: false
+        type: string
+        default: '.'
+      turbo:
+        description: 'Enable Turborepo caching'
+        required: false
+        type: boolean
+        default: false
+      run-lint:
+        description: 'Run lint step'
+        required: false
+        type: boolean
+        default: true
+      run-typecheck:
+        description: 'Run typecheck step'
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: 'Run test step'
+        required: false
+        type: boolean
+        default: false
+      lint-command:
+        description: 'Custom lint command'
+        required: false
+        type: string
+        default: 'npm run lint'
+      typecheck-command:
+        description: 'Custom typecheck command'
+        required: false
+        type: string
+        default: 'npm run typecheck'
+      test-command:
+        description: 'Custom test command'
+        required: false
+        type: string
+        default: 'npm test'
+
+jobs:
+  ci:
+    name: Node.js CI
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Setup Turbo cache
+        if: inputs.turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            turbo-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        if: inputs.run-lint
+        run: ${{ inputs.lint-command }}
+
+      - name: Typecheck
+        if: inputs.run-typecheck
+        run: ${{ inputs.typecheck-command }}
+
+      - name: Test
+        if: inputs.run-test
+        run: ${{ inputs.test-command }}

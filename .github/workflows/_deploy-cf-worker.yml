@@ -1,0 +1,81 @@
+# Reusable Cloudflare Worker/Pages Deploy Workflow
+# SSoT: qws941/.github — do not duplicate in consuming repos
+#
+# Usage:
+#   jobs:
+#     deploy:
+#       uses: qws941/.github/.github/workflows/_deploy-cf-worker.yml@main
+#       with:
+#         working-directory: './worker'
+#         environment: production
+#       secrets: inherit
+
+name: Deploy Cloudflare Worker
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory containing wrangler.toml'
+        required: false
+        type: string
+        default: '.'
+      node-version:
+        description: 'Node.js version'
+        required: false
+        type: string
+        default: '20'
+      environment:
+        description: 'GitHub deployment environment name'
+        required: false
+        type: string
+        default: 'production'
+      deploy-command:
+        description: 'Wrangler deploy command'
+        required: false
+        type: string
+        default: 'deploy'
+      build-command:
+        description: 'Build command (empty to skip)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        if: inputs.build-command != ''
+        run: ${{ inputs.build-command }}
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ${{ inputs.working-directory }}
+          command: ${{ inputs.deploy-command }}

@@ -1,0 +1,36 @@
+# Auto-merge for Dependabot and owner PRs
+# SSoT: qws941/.github — synced to all repos (except terraform)
+# Synced via: .github/sync.yml → Group 2
+#
+# Triggers:
+#   - Dependabot PRs (auto-merge with squash)
+#   - Repository owner PRs (auto-merge with squash)
+#   - PRs with 'auto-merge' label
+
+name: Auto Merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: >-
+      github.actor == 'dependabot[bot]' ||
+      github.actor == github.repository_owner ||
+      contains(github.event.pull_request.labels.*.name, 'auto-merge')
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --auto || echo "Auto-merge already enabled or not mergeable"
