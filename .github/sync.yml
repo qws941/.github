@@ -1,0 +1,30 @@
+# File Sync Configuration
+# SSoT: qws941/.github — changes here auto-sync to all repos via PR
+# Docs: https://github.com/BetaHuhn/repo-file-sync-action
+
+group:
+  # Common governance files synced to all repos
+  - files:
+      - source: OWNERS
+        dest: OWNERS
+      - source: LICENSE
+        dest: LICENSE
+      - source: .editorconfig
+        dest: .editorconfig
+      - source: .github/CODEOWNERS
+        dest: .github/CODEOWNERS
+      - source: .github/dependabot.yml
+        dest: .github/dependabot.yml
+    repos: |
+      qws941/blacklist
+      qws941/claude
+      qws941/hycu_fsds
+      qws941/opencode
+      qws941/propose
+      qws941/resume
+      qws941/safework2
+      qws941/splunk
+      qws941/terraform
+      qws941/tmux
+      qws941/youtube
+      qws941/qws941
