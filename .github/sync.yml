@@ -2,12 +2,19 @@
 # SSoT: qws941/.github — changes here auto-sync to all repos via PR
 # Docs: https://github.com/BetaHuhn/repo-file-sync-action
 #
+# Synced files (truly common across all repos):
+#   - OWNERS, LICENSE, .editorconfig (governance)
+#   - .github/labeler.yml (PR auto-labeling)
+#   - .github/workflows/stale.yml (stale issue cleanup)
+#   - .github/workflows/labeler.yml (labeler workflow)
+#
 # NOT synced (repo-specific):
 #   - .github/dependabot.yml  (different ecosystems per repo)
 #   - .github/CODEOWNERS      (terraform/opencode have custom rules)
+#   - .github/copilot-instructions.md (repo-specific context)
 
 group:
-  # OWNERS + LICENSE + .editorconfig → all owned repos
+  # Core governance + workflows → all owned repos
   - files:
       - source: OWNERS
         dest: OWNERS
@@ -15,6 +22,12 @@ group:
         dest: LICENSE
       - source: .editorconfig
         dest: .editorconfig
+      - source: .github/labeler.yml
+        dest: .github/labeler.yml
+      - source: .github/workflows/stale.yml
+        dest: .github/workflows/stale.yml
+      - source: .github/workflows/labeler.yml
+        dest: .github/workflows/labeler.yml
     repos: |
       qws941/blacklist
       qws941/claude
@@ -27,11 +40,17 @@ group:
       qws941/tmux
       qws941/youtube
 
-  # opencode is a fork — sync OWNERS + .editorconfig only (not LICENSE)
+  # opencode is a fork — sync OWNERS + .editorconfig + workflows only (not LICENSE)
   - files:
       - source: OWNERS
         dest: OWNERS
       - source: .editorconfig
         dest: .editorconfig
+      - source: .github/labeler.yml
+        dest: .github/labeler.yml
+      - source: .github/workflows/stale.yml
+        dest: .github/workflows/stale.yml
+      - source: .github/workflows/labeler.yml
+        dest: .github/workflows/labeler.yml
     repos: |
       qws941/opencode
