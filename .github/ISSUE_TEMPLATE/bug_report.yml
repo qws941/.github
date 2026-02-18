@@ -44,6 +44,19 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Low — Cosmetic or minor inconvenience
+        - Medium — Broken feature with workaround available
+        - High — Broken feature with no workaround
+        - Critical — Data loss, security issue, or system outage
+    validations:
+      required: true
+
   - type: textarea
     id: environment
     attributes:

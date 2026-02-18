@@ -1,38 +1,57 @@
-## Summary
+## What This PR Does
 
-<!-- Brief description of what this PR does -->
+<!-- Describe WHAT this PR changes. Be specific. -->
 
-## Type of Change
+## Why
 
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] Feature (non-breaking change that adds functionality)
-- [ ] Refactoring (no functional changes)
-- [ ] Infrastructure / CI (Terraform, workflows, deployment)
-- [ ] Documentation
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
+<!-- Explain WHY this change is needed. Link to the problem or motivation. -->
+
+## Kind
+
+<!-- Select the type of change. Use the /kind label convention. -->
+
+- [ ] `/kind feat` — New feature or capability
+- [ ] `/kind fix` — Bug fix (non-breaking)
+- [ ] `/kind refactor` — Code restructuring (no behavior change)
+- [ ] `/kind infra` — Infrastructure, Terraform, CI/CD, deployment
+- [ ] `/kind docs` — Documentation only
+- [ ] `/kind chore` — Maintenance, dependencies, tooling
+- [ ] `/kind breaking` — Breaking change (requires migration or coordination)
 
 ## Changes
 
-<!-- List the key changes made in this PR -->
+<!-- List the key changes. Be concise. -->
 
 -
 -
 
 ## Testing
 
-<!-- Describe how you tested these changes -->
+<!-- How did you verify this change? -->
 
 - [ ] Tested locally
 - [ ] CI checks pass
-- [ ] Manual verification
+- [ ] `terraform plan` shows expected diff (if applicable)
+- [ ] Manual verification on staging/prod
+
+## Breaking Changes
+
+<!-- If this is a breaking change, describe the impact and migration path. -->
+<!-- Remove this section if not applicable. -->
+
+N/A
 
 ## Checklist
 
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my code
-- [ ] I have added/updated documentation as needed
-- [ ] My changes generate no new warnings or errors
+- [ ] PR title follows `type(scope): description` format
+- [ ] Code follows the project's existing style and conventions
+- [ ] Self-review completed
+- [ ] Documentation updated (if applicable)
+- [ ] No new warnings, errors, or type suppressions
+- [ ] Change is **< 200 LOC** (excluding generated/lock files), or justification provided
 
 ## Related Issues
+
+<!-- Use "Closes #123" to auto-close, or "Refs #123" for reference. -->
 
 Closes #

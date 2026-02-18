@@ -1,38 +1,106 @@
 # Security Policy
 
-## Reporting a Vulnerability
+This policy applies to all repositories under
+[qws941](https://github.com/qws941).
 
-If you discover a security vulnerability in any repository under this organization, please report it responsibly.
+---
 
-**Do NOT open a public GitHub issue for security vulnerabilities.**
+## Table of Contents
 
-### How to Report
+1. [Reporting a Vulnerability](#1-reporting-a-vulnerability)
+2. [Response Timeline](#2-response-timeline)
+3. [Scope](#3-scope)
+4. [Safe Harbor](#4-safe-harbor)
+5. [Supported Versions](#5-supported-versions)
+6. [Security Best Practices](#6-security-best-practices)
 
-1. Email **security@jclee.me** with:
-   - A description of the vulnerability
-   - Steps to reproduce
-   - Affected repository and version/commit
-   - Any potential impact assessment
+---
 
-2. You will receive an acknowledgment within **48 hours**.
+## 1. Reporting a Vulnerability
 
-3. We will provide a detailed response within **5 business days**, including:
-   - Confirmation of the vulnerability
-   - Plan and timeline for a fix
-   - Credit attribution (if desired)
+> **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-### Scope
+### 1.1. How to Report
 
-This policy applies to all repositories under the [qws941](https://github.com/qws941) organization.
+Email **security@jclee.me** with:
 
-### Safe Harbor
+- A description of the vulnerability
+- Steps to reproduce
+- Affected repository and version/commit
+- Potential impact assessment (severity estimate)
+- Any suggested fix or mitigation
 
-We consider security research conducted in good faith to be authorized. We will not pursue legal action against researchers who:
+### 1.2. What to Expect
 
-- Make a good faith effort to avoid privacy violations and disruption
-- Report vulnerabilities promptly
-- Allow reasonable time for remediation before disclosure
+We take all security reports seriously and will respond promptly. See
+[Section 2](#2-response-timeline) for our response commitments.
 
-## Supported Versions
+---
 
-Only the latest version (main/master branch) of each repository is actively supported with security updates.
+## 2. Response Timeline
+
+| Stage                  | SLA                  |
+| ---------------------- | -------------------- |
+| Acknowledgment         | Within **48 hours**  |
+| Initial assessment     | Within **5 business days** |
+| Fix or mitigation plan | Within **10 business days** |
+| Public disclosure      | After fix is deployed, coordinated with reporter |
+
+If a vulnerability is actively exploited, we will expedite the response.
+
+---
+
+## 3. Scope
+
+### 3.1. In Scope
+
+- All public and private repositories under [qws941](https://github.com/qws941)
+- Infrastructure managed by these repositories (Proxmox, Cloudflare, etc.)
+- CI/CD workflows and automation
+- Secrets management and access controls
+
+### 3.2. Out of Scope
+
+- Third-party services not maintained by this account
+- Vulnerabilities in upstream dependencies (report to the upstream project)
+- Social engineering attacks
+
+---
+
+## 4. Safe Harbor
+
+We consider security research conducted in **good faith** to be authorized.
+We will not pursue legal action against researchers who:
+
+- Make a good faith effort to avoid privacy violations and service disruption
+- Do not access or modify data belonging to other users
+- Report vulnerabilities promptly and allow reasonable time for remediation
+- Do not publicly disclose vulnerability details before a fix is available
+
+We will credit researchers in the fix advisory (unless they prefer anonymity).
+
+---
+
+## 5. Supported Versions
+
+Only the **latest version** (default branch: `master` or `main`) of each
+repository is actively supported with security updates.
+
+Archived repositories (`cloudflare`, `proxmox`) are not maintained — their
+functionality has been migrated to the
+[terraform](https://github.com/qws941/terraform) monorepo.
+
+---
+
+## 6. Security Best Practices
+
+These practices are enforced across all repositories:
+
+| Practice                           | Implementation                      |
+| ---------------------------------- | ----------------------------------- |
+| Dependency scanning                | Dependabot alerts + security fixes  |
+| Secret scanning                    | GitHub secret scanning enabled      |
+| Branch protection                  | Rulesets with linear history required |
+| Code review                        | CODEOWNERS required reviews         |
+| No hardcoded secrets               | Vault, env vars, or `.env.example`  |
+| Signed commits (terraform repo)    | Required signatures via ruleset     |

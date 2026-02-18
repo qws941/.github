@@ -8,6 +8,19 @@ body:
         Thanks for suggesting a feature!
         Please describe your idea clearly so we can evaluate and prioritize it.
 
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: What kind of change is this?
+      options:
+        - New feature — Something that doesn't exist yet
+        - Enhancement — Improvement to existing functionality
+        - Performance — Speed, efficiency, or resource optimization
+        - Developer experience — Tooling, CI/CD, or workflow improvement
+    validations:
+      required: true
+
   - type: textarea
     id: summary
     attributes:
