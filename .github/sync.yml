@@ -1,9 +1,13 @@
 # File Sync Configuration
 # SSoT: qws941/.github — changes here auto-sync to all repos via PR
 # Docs: https://github.com/BetaHuhn/repo-file-sync-action
+#
+# NOT synced (repo-specific):
+#   - .github/dependabot.yml  (different ecosystems per repo)
+#   - .github/CODEOWNERS      (terraform/opencode have custom rules)
 
 group:
-  # Common governance files synced to all repos
+  # OWNERS + LICENSE + .editorconfig → all owned repos
   - files:
       - source: OWNERS
         dest: OWNERS
@@ -11,15 +15,10 @@ group:
         dest: LICENSE
       - source: .editorconfig
         dest: .editorconfig
-      - source: .github/CODEOWNERS
-        dest: .github/CODEOWNERS
-      - source: .github/dependabot.yml
-        dest: .github/dependabot.yml
     repos: |
       qws941/blacklist
       qws941/claude
       qws941/hycu_fsds
-      qws941/opencode
       qws941/propose
       qws941/resume
       qws941/safework2
@@ -27,4 +26,12 @@ group:
       qws941/terraform
       qws941/tmux
       qws941/youtube
-      qws941/qws941
+
+  # opencode is a fork — sync OWNERS + .editorconfig only (not LICENSE)
+  - files:
+      - source: OWNERS
+        dest: OWNERS
+      - source: .editorconfig
+        dest: .editorconfig
+    repos: |
+      qws941/opencode
