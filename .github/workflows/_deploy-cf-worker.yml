@@ -4,7 +4,7 @@
 # Usage:
 #   jobs:
 #     deploy:
-#       uses: qws941/.github/.github/workflows/_deploy-cf-worker.yml@main
+#       uses: qws941/.github/.github/workflows/_deploy-cf-worker.yml@master
 #       with:
 #         working-directory: './worker'
 #         environment: production

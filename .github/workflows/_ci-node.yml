@@ -4,7 +4,7 @@
 # Usage:
 #   jobs:
 #     ci:
-#       uses: qws941/.github/.github/workflows/_ci-node.yml@main
+#       uses: qws941/.github/.github/workflows/_ci-node.yml@master
 #       with:
 #         node-version: '20'
 #         turbo: true

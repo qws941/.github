@@ -8,7 +8,7 @@ Personal infrastructure and development projects by **JC Lee**.
 
 This account hosts homelab infrastructure management, developer tooling,
 and open-source projects. All repositories follow
-[Google3-style conventions](https://github.com/qws941/.github/blob/main/CONTRIBUTING.md)
+[Google3-style conventions](https://github.com/qws941/.github/blob/master/CONTRIBUTING.md)
 with trunk-based development, CODEOWNERS enforcement, and standardized CI/CD.
 
 ---
@@ -65,7 +65,7 @@ All repositories adhere to:
 - **Dependabot** for automated dependency updates
 - **Branch rulesets** with linear history enforcement
 
-See [CONTRIBUTING.md](https://github.com/qws941/.github/blob/main/CONTRIBUTING.md)
+See [CONTRIBUTING.md](https://github.com/qws941/.github/blob/master/CONTRIBUTING.md)
 for full conventions.
 
 ---
@@ -74,4 +74,4 @@ for full conventions.
 
 - **Website**: [jclee.me](https://jclee.me)
 - **GitHub**: [@qws941](https://github.com/qws941)
-- **Security**: [SECURITY.md](https://github.com/qws941/.github/blob/main/SECURITY.md)
+- **Security**: [SECURITY.md](https://github.com/qws941/.github/blob/master/SECURITY.md)
