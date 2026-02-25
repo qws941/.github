@@ -7,7 +7,8 @@
 #   - .github/labeler.yml (PR auto-labeling)
 #   - .github/workflows/stale.yml (stale issue cleanup)
 #   - .github/workflows/labeler.yml (labeler workflow)
-#   - .github/workflows/auto-merge.yml (dependabot/owner auto-merge)
+#   - .github/workflows/auto-merge.yml (dependabot/owner/codex auto-merge)
+#   - .github/workflows/codex-auto-issue.yml (codex issue automation)
 #
 # NOT synced (repo-specific):
 #   - .github/dependabot.yml  (different ecosystems per repo)
@@ -53,5 +54,21 @@ group:
       qws941/resume
       qws941/safework2
       qws941/splunk
+      qws941/tmux
+      qws941/youtube
+
+  # Group 3: Codex auto-issue → all repos (generic, no repo-specific logic)
+  - files:
+      - source: .github/workflows/codex-auto-issue.yml
+        dest: .github/workflows/codex-auto-issue.yml
+    repos: |
+      qws941/blacklist
+      qws941/hycu_fsds
+      qws941/propose
+      qws941/qws941
+      qws941/resume
+      qws941/safework2
+      qws941/splunk
+      qws941/terraform
       qws941/tmux
       qws941/youtube
