@@ -242,7 +242,7 @@ Path-based labels defined in `.github/labeler.yml`:
 
 ### Repository Rulesets
 
-Three standard rulesets applied to all non-archived repos via `scripts/sync-rulesets.sh`:
+Three standard rulesets applied to all non-archived repos (except `terraform`) via `scripts/sync-rulesets.sh`:
 
 | Ruleset | Target | Scope | Key Rules |
 | --- | --- | --- | --- |

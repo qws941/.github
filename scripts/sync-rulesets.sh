@@ -20,6 +20,7 @@ set -euo pipefail
 
 readonly ORG="qws941"
 readonly CONFIG_REPOS=".github qws941"
+readonly EXCLUDED_REPOS="terraform"
 
 DRY_RUN=false
 DELETE_ALL=false
@@ -66,6 +67,12 @@ echo ""
 is_config_repo() {
   local name="${1#*/}"
   for cr in $CONFIG_REPOS; do [[ "$name" == "$cr" ]] && return 0; done
+  return 1
+}
+
+is_excluded_repo() {
+  local name="${1#*/}"
+  for er in $EXCLUDED_REPOS; do [[ "$name" == "$er" ]] && return 0; done
   return 1
 }
 
@@ -251,6 +258,12 @@ build_tag_protection_payload() {
 
 for repo in "${REPOS[@]}"; do
   echo -e "${BOLD}=== $repo ===${NC}"
+
+  if is_excluded_repo "$repo"; then
+    echo -e "  ${YELLOW}⊘ skipped (excluded)${NC}"
+    echo ""
+    continue
+  fi
 
   approvals=1
   is_config_repo "$repo" && approvals=0
