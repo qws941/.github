@@ -17,6 +17,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 │   │   ├── _ci-node.yml            # Reusable Node.js CI (workflow_call)
 │   │   ├── _ci-python.yml          # Reusable Python CI (workflow_call)
 │   │   ├── _deploy-cf-worker.yml   # Reusable CF Worker deploy (workflow_call)
+│   │   ├── _elk-ingest.yml        # Reusable ELK ingest (workflow_call)
 │   │   ├── auto-merge.yml          # Dependabot + owner auto-merge (synced)
 │   │   ├── labeler.yml             # PR auto-labeling workflow (synced)
 │   │   ├── stale.yml               # Stale issue cleanup 14d+5d (synced)
@@ -99,13 +100,14 @@ This repo is the canonical source. Changes propagate automatically:
 
 ### Reusable Workflows
 
-Three `workflow_call` workflows prefixed with `_` (not synced, called via `uses:`):
+Four `workflow_call` workflows prefixed with `_` (not synced, called via `uses:`):
 
 | Workflow                | Purpose                      | Key Inputs                                           |
 | ----------------------- | ---------------------------- | ---------------------------------------------------- |
 | `_ci-node.yml`          | Node.js CI (lint/type/test)  | `node-version`, `turbo`, `run-lint`, `run-test`      |
 | `_ci-python.yml`        | Python CI (ruff/mypy/pytest) | `python-version`, `run-mypy`, `run-test`, `src-dirs` |
 | `_deploy-cf-worker.yml` | Cloudflare Worker deploy     | `working-directory`, `environment`, `deploy-command` |
+| `_elk-ingest.yml`       | ELK ingest (CI/CD events)    | `conclusion`, `index-prefix`, `service`, `extra-fields` |
 
 Usage pattern in consuming repos:
 

@@ -1,0 +1,143 @@
+# SSoT: qws941/.github — reusable workflow, NOT synced.
+# Forwards GitHub Actions events to Elasticsearch for CI/CD observability.
+#
+# Usage:
+#   jobs:
+#     ci:
+#       uses: qws941/.github/.github/workflows/_ci-node.yml@master
+#       ...
+#     elk:
+#       needs: [ci]
+#       if: always()
+#       uses: qws941/.github/.github/workflows/_elk-ingest.yml@master
+#       with:
+#         conclusion: ${{ needs.ci.result }}
+#       secrets: inherit
+#
+# Repository variables:
+#   RUNNER             — runner label with ELK network access
+#   ELASTICSEARCH_URL  — endpoint (e.g., http://192.168.50.105:9200)
+#
+# Optional secrets:
+#   ELASTICSEARCH_API_KEY — API key for xpack-secured clusters
+
+name: ELK Ingest
+
+on:
+  workflow_call:
+    inputs:
+      conclusion:
+        description: "Workflow conclusion (success, failure, cancelled)"
+        required: true
+        type: string
+      index-prefix:
+        description: "Elasticsearch index prefix"
+        required: false
+        type: string
+        default: "github-actions"
+      service:
+        description: "Service name for filtering (defaults to repo name)"
+        required: false
+        type: string
+        default: ""
+      extra-fields:
+        description: "Additional JSON fields merged into the document"
+        required: false
+        type: string
+        default: "{}"
+  workflow_dispatch:
+    inputs:
+      conclusion:
+        description: "Test conclusion value"
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+          - cancelled
+
+permissions: {}
+
+jobs:
+  ingest:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    steps:
+      - name: Index event to Elasticsearch
+        continue-on-error: true
+        env:
+          ELASTICSEARCH_URL: ${{ vars.ELASTICSEARCH_URL }}
+          ELASTICSEARCH_API_KEY: ${{ secrets.ELASTICSEARCH_API_KEY }}
+          INPUT_CONCLUSION: ${{ inputs.conclusion }}
+          INPUT_INDEX_PREFIX: ${{ inputs.index-prefix || 'github-actions' }}
+          INPUT_SERVICE: ${{ inputs.service }}
+          INPUT_EXTRA_FIELDS: ${{ inputs.extra-fields || '{}' }}
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_SHA: ${{ github.sha }}
+          GH_ACTOR: ${{ github.actor }}
+          GH_EVENT: ${{ github.event_name }}
+        run: |
+          if [ -z "$ELASTICSEARCH_URL" ]; then
+            echo "::warning::ELASTICSEARCH_URL not configured — skipping ELK ingest"
+            exit 0
+          fi
+
+          SERVICE="${INPUT_SERVICE:-${GH_REPO##*/}}"
+          INDEX="${INPUT_INDEX_PREFIX}-$(date -u +%Y.%m.%d)"
+
+          PAYLOAD=$(jq -n \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg repo "$GH_REPO" \
+            --arg workflow "$GH_WORKFLOW" \
+            --arg run_id "$GH_RUN_ID" \
+            --arg run_number "$GH_RUN_NUMBER" \
+            --arg run_url "$GH_RUN_URL" \
+            --arg conclusion "$INPUT_CONCLUSION" \
+            --arg branch "$GH_REF_NAME" \
+            --arg sha "$GH_SHA" \
+            --arg actor "$GH_ACTOR" \
+            --arg event "$GH_EVENT" \
+            --arg service "$SERVICE" \
+            --argjson extra "$INPUT_EXTRA_FIELDS" \
+            '{
+              "@timestamp": $ts,
+              "service": $service,
+              "github": {
+                "repository": $repo,
+                "workflow": $workflow,
+                "run_id": ($run_id | tonumber),
+                "run_number": ($run_number | tonumber),
+                "run_url": $run_url,
+                "conclusion": $conclusion,
+                "branch": $branch,
+                "sha": $sha,
+                "sha_short": ($sha | .[0:7]),
+                "actor": $actor,
+                "event": $event
+              }
+            } + $extra')
+
+          CURL_ARGS=(-s -o /tmp/es-response.json -w "%{http_code}" \
+            -X POST "${ELASTICSEARCH_URL}/${INDEX}/_doc" \
+            -H "Content-Type: application/json")
+
+          if [ -n "$ELASTICSEARCH_API_KEY" ]; then
+            CURL_ARGS+=(-H "Authorization: ApiKey ${ELASTICSEARCH_API_KEY}")
+          fi
+
+          CURL_ARGS+=(-d "$PAYLOAD")
+
+          HTTP_CODE=$(curl "${CURL_ARGS[@]}")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            DOC_ID=$(jq -r '._id // empty' /tmp/es-response.json)
+            echo "Indexed to ${INDEX} (HTTP ${HTTP_CODE}, doc: ${DOC_ID})"
+          else
+            echo "::warning::ELK ingest failed (HTTP ${HTTP_CODE})"
+            cat /tmp/es-response.json 2>/dev/null || true
+          fi
