@@ -213,7 +213,7 @@ build_default_branch_payload() {
     target: "branch",
     enforcement: "active",
     conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
-    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}],
+    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}, {actor_id: 1144995, actor_type: "Integration", bypass_mode: "always"}, {actor_id: 1549082, actor_type: "Integration", bypass_mode: "always"}],
     rules: $rules
   }'
 }
@@ -224,7 +224,7 @@ build_code_scanning_payload() {
     target: "branch",
     enforcement: "active",
     conditions: {ref_name: {include: ["~ALL"], exclude: []}},
-    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}],
+    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}, {actor_id: 1144995, actor_type: "Integration", bypass_mode: "always"}, {actor_id: 1549082, actor_type: "Integration", bypass_mode: "always"}],
     rules: [{
       type: "code_scanning",
       parameters: {
@@ -244,7 +244,7 @@ build_tag_protection_payload() {
     target: "tag",
     enforcement: "active",
     conditions: {ref_name: {include: ["refs/tags/v*"], exclude: []}},
-    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}],
+    bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}, {actor_id: 1144995, actor_type: "Integration", bypass_mode: "always"}, {actor_id: 1549082, actor_type: "Integration", bypass_mode: "always"}],
     rules: [
       {"type": "creation"},
       {"type": "update"},
