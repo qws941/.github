@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LABELS_FILE="${SCRIPT_DIR}/labels.yml"
-ORG="qws941"
+ORG="${GITHUB_ORG:-qws941}"
 DRY_RUN=false
 SINGLE_REPO=""
 
