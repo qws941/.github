@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-GitHub community health files **Single Source of Truth (SSoT)** for all `qws941` repositories. Contains governance files, reusable CI/CD workflows, issue templates, label definitions, and repository rulesets that auto-sync to downstream repos. No application code — config and policy only.
+GitHub community health files **Single Source of Truth (SSoT)** for all `qws941-lab` repositories. Contains governance files, reusable CI/CD workflows, issue templates, label definitions, and repository rulesets that auto-sync to downstream repos. No application code — config and policy only.
 
 ## STRUCTURE
 
@@ -80,7 +80,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 | Label sync to repos           | `scripts/sync-labels.sh`           | Uses `gh` CLI + python3/pyyaml, run manually               |
 | Contribution rules            | `CONTRIBUTING.md`                  | Trunk-based dev, conventional commits, review SLA          |
 | Security reports              | `SECURITY.md`                      | Email security@jclee.me, 48h response SLA                  |
-| GitHub profile page           | `profile/README.md`                | Rendered at github.com/qws941                              |
+| GitHub profile page           | `profile/README.md`                | Rendered at github.com/qws941-lab                              |
 | Editor formatting             | `.editorconfig`                    | Synced to all repos                                        |
 | Codex automation              | `.github/workflows/codex-*.yml`    | Triage on issue open + auto-issue on label                 |
 | Community automation        | `.github/workflows/{welcome,lock-threads}.yml` | First-time greeting + thread locking             |
@@ -168,14 +168,14 @@ Single consolidated sync group covering 12 repositories. All governance files, w
 | `_stale.yml`              | Close stale issues/PRs (14d+5d)    | —                    |
 | `_welcome.yml`            | Greet first-time contributors      | —                    |
 
-**Architecture**: Synced workflow files (e.g., `stale.yml`) are thin callers (~15 lines) that reference the template via `uses: qws941/.github/.github/workflows/_stale.yml@master`. Templates contain all logic; callers only define triggers and permissions.
+**Architecture**: Synced workflow files (e.g., `stale.yml`) are thin callers (~15 lines) that reference the template via `uses: qws941-lab/.github/.github/workflows/_stale.yml@master`. Templates contain all logic; callers only define triggers and permissions.
 
 Usage pattern in consuming repos:
 
 ```yaml
 jobs:
   ci:
-    uses: qws941/.github/.github/workflows/_ci-node.yml@master
+    uses: qws941-lab/.github/.github/workflows/_ci-node.yml@master
     with:
       node-version: "20"
     secrets: inherit
@@ -360,7 +360,7 @@ bash scripts/sync-labels.sh
 bash scripts/sync-labels.sh --dry-run
 
 # Sync to specific repo only
-bash scripts/sync-labels.sh --repo qws941/terraform
+bash scripts/sync-labels.sh --repo qws941-lab/terraform
 
 # File sync happens automatically on push to master
 # Manual trigger available via workflow_dispatch on sync-files.yml
@@ -375,14 +375,14 @@ bash scripts/sync-rulesets.sh --dry-run
 bash scripts/sync-rulesets.sh --delete-all
 
 # Sync rulesets to specific repo only
-bash scripts/sync-rulesets.sh --repo qws941/terraform
+bash scripts/sync-rulesets.sh --repo qws941-lab/terraform
 ```
 
 ## NOTES
 
 - This is a personal account `.github` repo, not a GitHub Organization `.github` repo. GitHub still honors community health file inheritance for the account's repos.
-- `profile/README.md` renders as the GitHub profile page at `github.com/qws941`.
-- Reusable workflows are consumed via `uses: qws941/.github/.github/workflows/_ci-node.yml@master` — note the double `.github` path segment.
+- `profile/README.md` renders as the GitHub profile page at `github.com/qws941-lab`.
+- Reusable workflows are consumed via `uses: qws941-lab/.github/.github/workflows/_ci-node.yml@master` — note the double `.github` path segment.
 - The `terraform` repo has custom CODEOWNERS (path-specific rules), which is why that file is not synced. Auto-merge is now standardized across all repos including terraform.
 - Secrets required: `GH_PAT` for sync-files workflow, `ANTHROPIC_API_KEY` for OpenCode agent workflow, `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` for CF Worker deploy workflow, `ELASTICSEARCH_URL` + optional `ELASTICSEARCH_API_KEY` for ELK ingest workflow.
 - `chatgpt-codex-connector` GitHub App installed with all-repo access. `@codex review` works in any repo PR. Issue-context `@codex` mentions do not trigger responses (known limitation).

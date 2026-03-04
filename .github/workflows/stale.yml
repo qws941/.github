@@ -1,5 +1,5 @@
 # Stale Issues and PRs
-# SSoT: qws941/.github — synced to all repos
+# SSoT: qws941-lab/.github — synced to all repos
 # Synced via: .github/sync.yml
 # Template: _stale.yml
 
@@ -20,4 +20,4 @@ permissions:
 
 jobs:
   stale:
-    uses: qws941/.github/.github/workflows/_stale.yml@master
+    uses: qws941-lab/.github/.github/workflows/_stale.yml@master

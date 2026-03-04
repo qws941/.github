@@ -1,7 +1,7 @@
 # Security Policy
 
 This policy applies to all repositories under
-[qws941](https://github.com/qws941).
+[qws941-lab](https://github.com/qws941-lab).
 
 ---
 
@@ -54,7 +54,7 @@ If a vulnerability is actively exploited, we will expedite the response.
 
 ### 3.1. In Scope
 
-- All public and private repositories under [qws941](https://github.com/qws941)
+- All public and private repositories under [qws941-lab](https://github.com/qws941-lab)
 - Infrastructure managed by these repositories (Proxmox, Cloudflare, etc.)
 - CI/CD workflows and automation
 - Secrets management and access controls
@@ -88,7 +88,7 @@ repository is actively supported with security updates.
 
 Archived repositories (`cloudflare`, `proxmox`) are not maintained — their
 functionality has been migrated to the
-[terraform](https://github.com/qws941/terraform) monorepo.
+[terraform](https://github.com/qws941-lab/terraform) monorepo.
 
 ---
 

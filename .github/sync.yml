@@ -1,11 +1,11 @@
 # File Sync Configuration
-# SSoT: qws941/.github — changes here auto-sync to all repos via PR
+# SSoT: qws941-lab/.github — changes here auto-sync to all repos via PR
 # Docs: https://github.com/BetaHuhn/repo-file-sync-action
 #
 # Architecture:
 #   - Reusable templates (_*.yml) live ONLY in this repo (not synced)
 #   - Thin callers (*.yml) are synced to all repos via this config
-#   - Callers reference templates via: uses: qws941/.github/.github/workflows/_*.yml@master
+#   - Callers reference templates via: uses: qws941-lab/.github/.github/workflows/_*.yml@master
 #
 # Synced files (truly common across all repos):
 #   - OWNERS, LICENSE, .editorconfig (governance)
@@ -74,16 +74,16 @@ group:
       - source: .github/workflows/ci-notify-failure.yml
         dest: .github/workflows/ci-notify-failure.yml
     repos: |
-      qws941/aimo3-prize
-      qws941/blacklist
-      qws941/hycu_fsds
-      qws941/opencode
-      qws941/propose
-      qws941/qws941
-      qws941/resume
-      qws941/safetywallet
-      qws941/slack-opencode-bridge
-      qws941/splunk
-      qws941/terraform
-      qws941/tmux
-      qws941/youtube
+      qws941-lab/aimo3-prize
+      qws941-lab/blacklist
+      qws941-lab/hycu_fsds
+      qws941-lab/opencode
+      qws941-lab/propose
+      qws941-lab/qws941
+      qws941-lab/resume
+      qws941-lab/safetywallet
+      qws941-lab/slack-opencode-bridge
+      qws941-lab/splunk
+      qws941-lab/terraform
+      qws941-lab/tmux
+      qws941-lab/youtube

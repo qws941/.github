@@ -1,10 +1,10 @@
 # Reusable Codex Auto-Issue Workflow
-# SSoT: qws941/.github — do not duplicate in consuming repos
+# SSoT: qws941-lab/.github — do not duplicate in consuming repos
 #
 # Usage:
 #   jobs:
 #     codex:
-#       uses: qws941/.github/.github/workflows/_codex-auto-issue.yml@master
+#       uses: qws941-lab/.github/.github/workflows/_codex-auto-issue.yml@master
 
 name: Codex Auto-Issue
 

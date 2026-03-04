@@ -1,5 +1,5 @@
 # Release Drafter
-# SSoT: qws941/.github — synced to all repos
+# SSoT: qws941-lab/.github — synced to all repos
 # Synced via: .github/sync.yml
 # Template: _release-drafter.yml
 
@@ -16,4 +16,4 @@ permissions:
 
 jobs:
   draft:
-    uses: qws941/.github/.github/workflows/_release-drafter.yml@master
+    uses: qws941-lab/.github/.github/workflows/_release-drafter.yml@master

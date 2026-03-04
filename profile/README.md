@@ -1,4 +1,4 @@
-# qws941
+# qws941-lab
 
 Personal infrastructure and development projects by **JC Lee**.
 
@@ -8,7 +8,7 @@ Personal infrastructure and development projects by **JC Lee**.
 
 This account hosts homelab infrastructure management, developer tooling,
 and open-source projects. All repositories follow
-[Google3-style conventions](https://github.com/qws941/.github/blob/master/CONTRIBUTING.md)
+[Google3-style conventions](https://github.com/qws941-lab/.github/blob/master/CONTRIBUTING.md)
 with trunk-based development, CODEOWNERS enforcement, and standardized CI/CD.
 
 ---
@@ -19,31 +19,31 @@ with trunk-based development, CODEOWNERS enforcement, and standardized CI/CD.
 
 | Repository | Description | Stack |
 | ---------- | ----------- | ----- |
-| [terraform](https://github.com/qws941/terraform) | Multi-provider IaC monorepo (Proxmox, Cloudflare, GitHub) | HCL, Bazel |
-| [github](https://github.com/qws941/github) | GitHub infrastructure as code template | HCL |
-| [.github](https://github.com/qws941/.github) | Community health files, templates, and governance | Shell |
+| [terraform](https://github.com/qws941-lab/terraform) | Multi-provider IaC monorepo (Proxmox, Cloudflare, GitHub) | HCL, Bazel |
+| [github](https://github.com/qws941-lab/github) | GitHub infrastructure as code template | HCL |
+| [.github](https://github.com/qws941-lab/.github) | Community health files, templates, and governance | Shell |
 
 ### 2.2. Applications & Services
 
 | Repository | Description | Stack |
 | ---------- | ----------- | ----- |
-| [splunk](https://github.com/qws941/splunk) | Splunk apps and configurations | Python |
-| [blacklist](https://github.com/qws941/blacklist) | Blacklist management application | JavaScript |
-| [opencode](https://github.com/qws941/opencode) | OpenCode development platform | TypeScript |
+| [splunk](https://github.com/qws941-lab/splunk) | Splunk apps and configurations | Python |
+| [blacklist](https://github.com/qws941-lab/blacklist) | Blacklist management application | JavaScript |
+| [opencode](https://github.com/qws941-lab/opencode) | OpenCode development platform | TypeScript |
 
 ### 2.3. Tools & Automation
 
 | Repository | Description | Stack |
 | ---------- | ----------- | ----- |
-| [youtube](https://github.com/qws941/youtube) | YouTube automation tools | Python |
-| [tmux](https://github.com/qws941/tmux) | Tmux configuration | Shell |
+| [youtube](https://github.com/qws941-lab/youtube) | YouTube automation tools | Python |
+| [tmux](https://github.com/qws941-lab/tmux) | Tmux configuration | Shell |
 
 ### 2.4. Research & Academic
 
 | Repository | Description | Stack |
 | ---------- | ----------- | ----- |
-| [hycu_fsds](https://github.com/qws941/hycu_fsds) | HYCU FSDS autonomous driving | Python |
-| [resume](https://github.com/qws941/resume) | Personal resume and portfolio | JavaScript |
+| [hycu_fsds](https://github.com/qws941-lab/hycu_fsds) | HYCU FSDS autonomous driving | Python |
+| [resume](https://github.com/qws941-lab/resume) | Personal resume and portfolio | JavaScript |
 
 ### 2.5. Private
 
@@ -65,7 +65,7 @@ All repositories adhere to:
 - **Dependabot** for automated dependency updates
 - **Branch rulesets** with linear history enforcement
 
-See [CONTRIBUTING.md](https://github.com/qws941/.github/blob/master/CONTRIBUTING.md)
+See [CONTRIBUTING.md](https://github.com/qws941-lab/.github/blob/master/CONTRIBUTING.md)
 for full conventions.
 
 ---
@@ -74,4 +74,4 @@ for full conventions.
 
 - **Website**: [jclee.me](https://jclee.me)
 - **GitHub**: [@qws941](https://github.com/qws941)
-- **Security**: [SECURITY.md](https://github.com/qws941/.github/blob/master/SECURITY.md)
+- **Security**: [SECURITY.md](https://github.com/qws941-lab/.github/blob/master/SECURITY.md)
