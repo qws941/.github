@@ -1,5 +1,5 @@
 # Reusable CI Failure Notification Workflow
-# SSoT: qws941/.github — do not duplicate in consuming repos
+# SSoT: qws941-lab/.github — do not duplicate in consuming repos
 #
 # Creates a GitHub Issue when a CI workflow fails. Deduplicates by title prefix:
 # if an open issue with the same prefix exists, adds a comment instead.
@@ -8,7 +8,7 @@
 #   jobs:
 #     notify:
 #       if: failure()
-#       uses: qws941/.github/.github/workflows/_ci-notify-failure.yml@master
+#       uses: qws941-lab/.github/.github/workflows/_ci-notify-failure.yml@master
 #       with:
 #         title-prefix: '[CI] Build failed'
 

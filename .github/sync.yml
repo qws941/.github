@@ -67,8 +67,6 @@ group:
         dest: .github/workflows/auto-merge.yml
       - source: .github/workflows/codex-auto-issue.yml
         dest: .github/workflows/codex-auto-issue.yml
-      - source: .github/workflows/opencode.yml
-        dest: .github/workflows/opencode.yml
       - source: .github/workflows/issue-lifecycle.yml
         dest: .github/workflows/issue-lifecycle.yml
       - source: .github/workflows/ci-notify-failure.yml
