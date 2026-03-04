@@ -1,6 +1,12 @@
 # Reusable Codex Triage Workflow
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
+# Enhanced triage with:
+#   - Title keyword matching (failure, deploy, build, ELK, health, drift)
+#   - Label-based matching (elk-alert, health, infrastructure, ci-failure, drift)
+#   - Dedup check (skips if @codex comment already exists)
+#   - Context-aware investigation prompts (ELK, infra, drift, generic)
+#
 # Usage:
 #   jobs:
 #     triage:
@@ -16,22 +22,112 @@ jobs:
     name: Triage failure issues
     runs-on: ubuntu-latest
     if: >-
-      contains(github.event.issue.title, 'failed') ||
-      contains(github.event.issue.title, 'failure') ||
-      contains(github.event.issue.title, 'Failed') ||
-      contains(github.event.issue.title, 'Failure') ||
-      contains(github.event.issue.title, '[Deploy') ||
-      contains(github.event.issue.title, '[Build') ||
-      contains(github.event.issue.title, '[Docker') ||
-      contains(github.event.issue.title, 'Apply failed')
+      (github.event.action == 'opened' && (
+        contains(github.event.issue.title, 'failed') ||
+        contains(github.event.issue.title, 'failure') ||
+        contains(github.event.issue.title, 'Failed') ||
+        contains(github.event.issue.title, 'Failure') ||
+        contains(github.event.issue.title, '[Deploy') ||
+        contains(github.event.issue.title, '[Build') ||
+        contains(github.event.issue.title, '[Docker') ||
+        contains(github.event.issue.title, '[ELK Alert]') ||
+        contains(github.event.issue.title, '[Health') ||
+        contains(github.event.issue.title, '[Runner') ||
+        contains(github.event.issue.title, '[Drift') ||
+        contains(github.event.issue.title, 'Apply failed') ||
+        contains(github.event.issue.title, 'Plan failed')
+      )) ||
+      (github.event.action == 'labeled' &&
+        github.event.label.name != 'codex' && (
+        github.event.label.name == 'elk-alert' ||
+        github.event.label.name == 'health' ||
+        github.event.label.name == 'infrastructure' ||
+        github.event.label.name == 'ci-failure' ||
+        github.event.label.name == 'drift'
+      ))
     steps:
-      - name: Comment
+      - name: Check for existing Codex comment
+        id: dedup
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
+          result-encoding: string
           script: |
-            await github.rest.issues.createComment({
+            const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `@codex Investigate this issue. Check recent commits, CI logs, and deployment status. Provide a root cause analysis and suggest fixes.\n\nTitle: ${context.payload.issue.title}\n\nBody:\n${context.payload.issue.body || '(no body)'}`
+              per_page: 100,
+            });
+            const hasCodex = comments.data.some(c => c.body.includes('@codex'));
+            return hasCodex ? 'skip' : 'proceed';
+
+      - name: Request Codex investigation
+        if: steps.dedup.outputs.result == 'proceed'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = issue.title;
+            const labels = issue.labels.map(l => l.name);
+
+            let prompt;
+
+            if (title.includes('[ELK Alert]') || labels.includes('elk-alert')) {
+              prompt = [
+                '@codex Investigate this ELK alert.',
+                '',
+                'Context: This issue was auto-created by the ELK error detection pipeline.',
+                'The alert fired because tier 1-2 errors exceeded the threshold.',
+                '',
+                'Steps:',
+                '1. Parse the alert details from the issue body (service, classification, severity, tier)',
+                '2. Query the ELK stack for related log entries around the alert timestamp',
+                '3. Check if the affected service is currently healthy',
+                '4. Identify the root cause — check recent deployments, config changes, or upstream dependencies',
+                '5. If the fix is code-related, create a PR targeting the affected service',
+                '6. If it is infrastructure or transient, summarize findings and recommended remediation steps',
+              ];
+            } else if (
+              title.includes('[Health') ||
+              title.includes('[Runner') ||
+              labels.includes('health') ||
+              labels.includes('infrastructure')
+            ) {
+              prompt = [
+                '@codex Investigate this infrastructure issue.',
+                '',
+                'Steps:',
+                '1. Check the health status of the affected service or runner',
+                '2. Review recent system metrics (CPU, memory, disk, network)',
+                '3. Check if the issue correlates with recent deployments or config changes',
+                '4. If a service is down, check Docker container logs and restart status',
+                '5. Summarize the current state and recommended recovery steps',
+              ];
+            } else if (title.includes('[Drift') || labels.includes('drift')) {
+              prompt = [
+                '@codex Investigate this Terraform drift.',
+                '',
+                'Steps:',
+                '1. Identify which resources have drifted from the Terraform state',
+                '2. Determine if the drift was caused by manual changes or external automation',
+                '3. If safe to reconcile, create a PR to update the Terraform configuration',
+                '4. If the drift is intentional, document why and update the state accordingly',
+              ];
+            } else {
+              prompt = [
+                '@codex Investigate this failure.',
+                '',
+                'Steps:',
+                '1. Check the workflow run logs linked in this issue',
+                '2. Identify the root cause of the failure',
+                '3. If the issue is code-related, create a fix PR',
+                '4. If it is a credential, infrastructure, or transient issue, summarize findings and recommended next steps',
+              ];
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: prompt.join('\n'),
             });

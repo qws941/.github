@@ -71,6 +71,8 @@ group:
         dest: .github/workflows/opencode.yml
       - source: .github/workflows/issue-lifecycle.yml
         dest: .github/workflows/issue-lifecycle.yml
+      - source: .github/workflows/ci-notify-failure.yml
+        dest: .github/workflows/ci-notify-failure.yml
     repos: |
       qws941/aimo3-prize
       qws941/blacklist
@@ -80,6 +82,7 @@ group:
       qws941/qws941
       qws941/resume
       qws941/safetywallet
+      qws941/slack-opencode-bridge
       qws941/splunk
       qws941/terraform
       qws941/tmux

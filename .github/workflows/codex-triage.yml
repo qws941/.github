@@ -7,10 +7,14 @@ name: Codex Triage
 
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
 
 permissions:
   issues: write
+
+concurrency:
+  group: codex-triage-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   triage:
