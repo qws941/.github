@@ -1,15 +1,15 @@
-# SSoT: qws941-lab/.github — reusable workflow, NOT synced.
+# SSoT: qws941/.github — reusable workflow, NOT synced.
 # Forwards GitHub Actions events to Elasticsearch for CI/CD observability.
 #
 # Usage:
 #   jobs:
 #     ci:
-#       uses: qws941-lab/.github/.github/workflows/_ci-node.yml@master
+#       uses: qws941/.github/.github/workflows/_ci-node.yml@master
 #       ...
 #     elk:
 #       needs: [ci]
 #       if: always()
-#       uses: qws941-lab/.github/.github/workflows/_elk-ingest.yml@master
+#       uses: qws941/.github/.github/workflows/_elk-ingest.yml@master
 #       with:
 #         conclusion: ${{ needs.ci.result }}
 #       secrets: inherit

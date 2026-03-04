@@ -1,5 +1,5 @@
 # Codex Triage
-# SSoT: qws941-lab/.github — synced to all repos
+# SSoT: qws941/.github — synced to all repos
 # Synced via: .github/sync.yml
 # Template: _codex-triage.yml
 
@@ -18,4 +18,4 @@ concurrency:
 
 jobs:
   triage:
-    uses: qws941-lab/.github/.github/workflows/_codex-triage.yml@master
+    uses: qws941/.github/.github/workflows/_codex-triage.yml@master

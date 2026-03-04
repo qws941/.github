@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# sync-rulesets.sh — Sync standardized rulesets + repo settings across all qws941-lab repos
+# sync-rulesets.sh — Sync standardized rulesets + repo settings across all qws941 repos
 #
 # Usage:
 #   ./scripts/sync-rulesets.sh              # Upsert rulesets + repo settings
 #   ./scripts/sync-rulesets.sh --delete-all # Zero-base rebuild (delete all → recreate)
 #   ./scripts/sync-rulesets.sh --dry-run    # Preview changes without applying
-#   ./scripts/sync-rulesets.sh --repo qws941-lab/terraform  # Target single repo
+#   ./scripts/sync-rulesets.sh --repo qws941/terraform  # Target single repo
 #
 # Rulesets (3):
 #   1. default-branch-protection — PR reviews, linear history, merge policy
@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-readonly ORG="qws941-lab"
+readonly ORG="qws941"
 readonly CONFIG_REPOS=".github qws941"
 readonly EXCLUDED_REPOS="terraform"
 

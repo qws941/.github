@@ -17,5 +17,5 @@ concurrency:
 
 jobs:
   issue-lifecycle:
-    uses: qws941-lab/.github/.github/workflows/_issue-lifecycle.yml@master
+    uses: qws941/.github/.github/workflows/_issue-lifecycle.yml@master
     secrets: inherit

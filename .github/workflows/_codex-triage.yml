@@ -1,5 +1,5 @@
 # Reusable Codex Triage Workflow
-# SSoT: qws941-lab/.github — do not duplicate in consuming repos
+# SSoT: qws941/.github — do not duplicate in consuming repos
 #
 # Enhanced triage with:
 #   - Title keyword matching (failure, deploy, build, ELK, health, drift)
@@ -10,7 +10,7 @@
 # Usage:
 #   jobs:
 #     triage:
-#       uses: qws941-lab/.github/.github/workflows/_codex-triage.yml@master
+#       uses: qws941/.github/.github/workflows/_codex-triage.yml@master
 
 name: Codex Triage
 

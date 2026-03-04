@@ -1,5 +1,5 @@
 # Auto Merge
-# SSoT: qws941-lab/.github — synced to all repos
+# SSoT: qws941/.github — synced to all repos
 # Synced via: .github/sync.yml
 # Template: _auto-merge.yml
 #
@@ -18,5 +18,5 @@ permissions:
 
 jobs:
   auto-merge:
-    uses: qws941-lab/.github/.github/workflows/_auto-merge.yml@master
+    uses: qws941/.github/.github/workflows/_auto-merge.yml@master
     secrets: inherit

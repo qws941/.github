@@ -1,7 +1,7 @@
 # Contributing
 
 Thank you for your interest in contributing. This guide covers the conventions
-used across all repositories under [qws941-lab](https://github.com/qws941-lab).
+used across all repositories under [qws941](https://github.com/qws941).
 
 These conventions are inspired by
 [Google's Engineering Practices](https://google.github.io/eng-practices/),

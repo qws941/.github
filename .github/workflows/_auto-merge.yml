@@ -1,10 +1,10 @@
 # Reusable Auto-Merge Workflow
-# SSoT: qws941-lab/.github — do not duplicate in consuming repos
+# SSoT: qws941/.github — do not duplicate in consuming repos
 #
 # Usage:
 #   jobs:
 #     auto-merge:
-#       uses: qws941-lab/.github/.github/workflows/_auto-merge.yml@master
+#       uses: qws941/.github/.github/workflows/_auto-merge.yml@master
 #       secrets: inherit
 #
 # Required secrets:
