@@ -21,11 +21,15 @@ jobs:
             const issue = context.payload.issue;
             const issueAuthor = issue.user.login;
             const isBotAuthor = issue.user.type === 'Bot';
-            const assignee = isBotAuthor ? 'qws941' : issueAuthor;
-            const currentAssignees = issue.assignees.map(a => a.login);
 
-            if (currentAssignees.includes(assignee)) {
-              core.info(`Issue #${issue.number} already assigned to ${assignee}`);
+            if (isBotAuthor) {
+              core.info(`Issue #${issue.number} created by bot (${issueAuthor}); skipping auto-assign`);
+              return;
+            }
+
+            const currentAssignees = issue.assignees.map(a => a.login);
+            if (currentAssignees.includes(issueAuthor)) {
+              core.info(`Issue #${issue.number} already assigned to ${issueAuthor}`);
               return;
             }
 
@@ -33,14 +37,10 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              assignees: [assignee]
+              assignees: [issueAuthor]
             });
 
-            if (isBotAuthor) {
-              core.info(`Issue #${issue.number} created by bot (${issueAuthor}); assigned default owner qws941`);
-            } else {
-              core.info(`Assigned issue creator ${issueAuthor} to issue #${issue.number}`);
-            }
+            core.info(`Assigned issue creator ${issueAuthor} to issue #${issue.number}`);
 
   # Auto-assign PR author and detect linked issues
   pr-opened:
