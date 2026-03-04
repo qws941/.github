@@ -223,7 +223,7 @@ build_code_scanning_payload() {
     name: "code-scanning",
     target: "branch",
     enforcement: "active",
-    conditions: {ref_name: {include: ["~ALL"], exclude: []}},
+    conditions: {ref_name: {include: ["~ALL"], exclude: ["refs/heads/repo-sync/**"]}},
     bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always"}, {actor_id: 1144995, actor_type: "Integration", bypass_mode: "always"}, {actor_id: 1549082, actor_type: "Integration", bypass_mode: "always"}],
     rules: [{
       type: "code_scanning",
