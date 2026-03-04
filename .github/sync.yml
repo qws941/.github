@@ -11,7 +11,7 @@
 #   - OWNERS, LICENSE, .editorconfig (governance)
 #   - AGENTS.md (project knowledge base)
 #   - .github/FUNDING.yml, PULL_REQUEST_TEMPLATE.md (community)
-#   - .github/ISSUE_TEMPLATE/* (bug report, feature request, config)
+#   - .github/ISSUE_TEMPLATE/* (bug report, feature request, issue form, config)
 #   - .github/labeler.yml, release-drafter.yml (PR config)
 #   - .github/workflows/* (thin callers for all shared workflows)
 #
@@ -43,6 +43,8 @@ group:
         dest: .github/ISSUE_TEMPLATE/bug_report.yml
       - source: .github/ISSUE_TEMPLATE/feature_request.yml
         dest: .github/ISSUE_TEMPLATE/feature_request.yml
+      - source: .github/ISSUE_TEMPLATE/issue-form.yml
+        dest: .github/ISSUE_TEMPLATE/issue-form.yml
       - source: .github/ISSUE_TEMPLATE/config.yml
         dest: .github/ISSUE_TEMPLATE/config.yml
       - source: .github/workflows/stale.yml
