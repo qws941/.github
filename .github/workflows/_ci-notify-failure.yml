@@ -63,6 +63,13 @@ jobs:
               .map(l => l.trim())
               .filter(Boolean);
 
+            // GraphQL mutation for assigning Codex bot
+            const assignMutation = `mutation($issueId: ID!, $assigneeIds: [ID!]!) {
+              addAssigneesToAssignable(input: {assignableId: $issueId, assigneeIds: $assigneeIds}) {
+                clientMutationId
+              }
+            }`;
+
             // Build title — use input prefix or derive from workflow_run context
             let titlePrefix;
             if (inputPrefix) {
@@ -137,12 +144,11 @@ jobs:
                 body: commentBody,
               });
 
+              // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
               try {
-                await github.rest.issues.addAssignees({
-                  owner,
-                  repo,
-                  issue_number: duplicate.number,
-                  assignees: ['Codex'],
+                await github.graphql(assignMutation, {
+                  issueId: duplicate.node_id,
+                  assigneeIds: ['BOT_kgDODnSAjQ'],
                 });
               } catch (e) {
                 core.warning('Failed to assign issue: ' + e.message);
@@ -158,12 +164,11 @@ jobs:
                 labels,
               });
 
+              // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
               try {
-                await github.rest.issues.addAssignees({
-                  owner,
-                  repo,
-                  issue_number: created.data.number,
-                  assignees: ['Codex'],
+                await github.graphql(assignMutation, {
+                  issueId: created.data.node_id,
+                  assigneeIds: ['BOT_kgDODnSAjQ'],
                 });
               } catch (e) {
                 core.warning('Failed to assign issue: ' + e.message);

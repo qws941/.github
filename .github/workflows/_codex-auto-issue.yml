@@ -37,13 +37,16 @@ jobs:
               body: `@codex\n\n**Task:** ${title}\n\n**Context:**\n${body}`
             });
 
-            // Assign Codex bot to the issue
+            // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
             try {
-              await github.rest.issues.addAssignees({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                assignees: ['Codex'],
+              const mutation = `mutation($issueId: ID!, $assigneeIds: [ID!]!) {
+                addAssigneesToAssignable(input: {assignableId: $issueId, assigneeIds: $assigneeIds}) {
+                  clientMutationId
+                }
+              }`;
+              await github.graphql(mutation, {
+                issueId: context.payload.issue.node_id,
+                assigneeIds: ['BOT_kgDODnSAjQ'],
               });
             } catch (error) {
               core.warning(`Failed to assign Codex: ${error.message}`);

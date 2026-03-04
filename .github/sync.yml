@@ -71,6 +71,8 @@ group:
         dest: .github/workflows/issue-lifecycle.yml
       - source: .github/workflows/ci-notify-failure.yml
         dest: .github/workflows/ci-notify-failure.yml
+      - source: .github/workflows/auto-approve-runs.yml
+        dest: .github/workflows/auto-approve-runs.yml
     repos: |
       qws941/aimo3-prize
       qws941/blacklist

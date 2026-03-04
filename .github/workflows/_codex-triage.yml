@@ -36,7 +36,12 @@ jobs:
         contains(github.event.issue.title, '[Runner') ||
         contains(github.event.issue.title, '[Drift') ||
         contains(github.event.issue.title, 'Apply failed') ||
-        contains(github.event.issue.title, 'Plan failed')
+        contains(github.event.issue.title, 'Plan failed') ||
+        contains(github.event.issue.title, '[CI]') ||
+        contains(github.event.issue.title, '[Secret') ||
+        contains(github.event.issue.title, '[MCP') ||
+        contains(github.event.issue.title, '[Cloudflare') ||
+        contains(github.event.issue.title, '[Terraform')
       )) ||
       (github.event.action == 'labeled' &&
         github.event.label.name != 'codex' && (
@@ -133,13 +138,16 @@ jobs:
               body: prompt.join('\n'),
             });
 
-            // Assign Codex bot to the issue
+            // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
             try {
-              await github.rest.issues.addAssignees({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                assignees: ['Codex'],
+              const mutation = `mutation($issueId: ID!, $assigneeIds: [ID!]!) {
+                addAssigneesToAssignable(input: {assignableId: $issueId, assigneeIds: $assigneeIds}) {
+                  clientMutationId
+                }
+              }`;
+              await github.graphql(mutation, {
+                issueId: issue.node_id,
+                assigneeIds: ['BOT_kgDODnSAjQ'],
               });
             } catch (error) {
               core.warning(`Failed to assign Codex: ${error.message}`);

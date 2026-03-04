@@ -23,7 +23,21 @@ jobs:
             const isBotAuthor = issue.user.type === 'Bot';
 
             if (isBotAuthor) {
-              core.info(`Issue #${issue.number} created by bot (${issueAuthor}); skipping auto-assign`);
+              // Assign Codex bot to bot-created issues via GraphQL
+              try {
+                const mutation = `mutation($issueId: ID!, $assigneeIds: [ID!]!) {
+                  addAssigneesToAssignable(input: {assignableId: $issueId, assigneeIds: $assigneeIds}) {
+                    clientMutationId
+                  }
+                }`;
+                await github.graphql(mutation, {
+                  issueId: issue.node_id,
+                  assigneeIds: ['BOT_kgDODnSAjQ'],
+                });
+                core.info(`Assigned Codex to bot-created issue #${issue.number}`);
+              } catch (error) {
+                core.warning(`Failed to assign Codex to issue #${issue.number}: ${error.message}`);
+              }
               return;
             }
 

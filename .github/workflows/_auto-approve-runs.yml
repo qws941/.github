@@ -1,0 +1,91 @@
+# Reusable Auto-Approve Runs Workflow
+# SSoT: qws941/.github — do not duplicate in consuming repos
+#
+# Event-driven: triggered by sync PR events, not cron polling.
+# Approves action_required workflow runs and reruns stale failures.
+#
+# Required secrets:
+#   - GH_PAT: GitHub PAT with actions:write permission
+
+name: Auto Approve Runs
+
+on:
+  workflow_call:
+
+jobs:
+  approve:
+    name: Approve pending runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for workflow runs to queue
+        run: sleep 15
+
+      - name: Approve action_required runs and rerun stale failures
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            let approved = 0;
+            let rerun = 0;
+
+            try {
+              const { data: pendingRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                status: 'action_required',
+                per_page: 100,
+              });
+
+              for (const run of pendingRuns.workflow_runs) {
+                try {
+                  await github.rest.actions.approveWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                  approved++;
+                  core.info(`Approved run #${run.id} (${run.name})`);
+                } catch (e) {
+                  core.warning(`Failed to approve run #${run.id}: ${e.message}`);
+                }
+              }
+            } catch (e) {
+              core.warning(`Failed to list action_required runs: ${e.message}`);
+            }
+
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            try {
+              const { data: failedRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                status: 'failure',
+                created: `>=${since}`,
+                per_page: 50,
+              });
+
+              const syncRuns = failedRuns.workflow_runs.filter(
+                r => r.actor?.login === 'github-actions[bot]' || r.actor?.login === 'qws941'
+              );
+
+              for (const run of syncRuns) {
+                if (run.run_attempt > 1) continue;
+                try {
+                  await github.rest.actions.reRunWorkflowFailedJobs({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                  rerun++;
+                  core.info(`Rerun failed jobs for run #${run.id} (${run.name})`);
+                } catch (e) {
+                  core.warning(`Failed to rerun #${run.id}: ${e.message}`);
+                }
+              }
+            } catch (e) {
+              core.warning(`Failed to list failed runs: ${e.message}`);
+            }
+
+            core.info(`Done: ${approved} approved, ${rerun} rerun`);
