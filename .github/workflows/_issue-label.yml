@@ -1,0 +1,84 @@
+# Reusable Issue Auto-Label Workflow
+# SSoT: qws941/.github — do not duplicate in consuming repos
+#
+# Parses issue body from GitHub Issue Form dropdowns and applies
+# type:* and priority:* labels automatically.
+#
+# Usage:
+#   jobs:
+#     label:
+#       uses: qws941/.github/.github/workflows/_issue-label.yml@master
+
+name: Issue Auto-Label
+
+on:
+  workflow_call:
+
+jobs:
+  label:
+    name: Auto-label from issue form
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: issue-label-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Apply labels from issue form
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const body = context.payload.issue?.body || '';
+            const labels = [];
+
+            // Type mapping (Korean issue form — 유형 dropdown)
+            const typeMatch = body.match(/### 유형\s*\n\s*(.+)/);
+            if (typeMatch) {
+              const typeMap = {
+                '🐛 버그': 'type:bug',
+                '✨ 기능 요청': 'type:feature',
+                '🔧 유지보수': 'type:chore',
+                '📝 문서': 'type:docs',
+              };
+              const mapped = typeMap[typeMatch[1].trim()];
+              if (mapped) labels.push(mapped);
+            }
+
+            // Priority mapping (Korean 우선순위 + English Priority)
+            const priMatch = body.match(/### (?:우선순위|Priority)\s*\n\s*(.+)/);
+            if (priMatch) {
+              const priMap = {
+                '🔴 긴급 (P0)': 'priority:critical',
+                '🟠 높음 (P1)': 'priority:high',
+                '🟡 보통 (P2)': 'priority:medium',
+                '🟢 낮음 (P3)': 'priority:low',
+                'P0 - Critical (service down)': 'priority:critical',
+                'P1 - High (degraded)': 'priority:high',
+                'P2 - Medium (workaround exists)': 'priority:medium',
+                'P3 - Low (cosmetic)': 'priority:low',
+              };
+              const mapped = priMap[priMatch[1].trim()];
+              if (mapped) labels.push(mapped);
+            }
+
+            if (labels.length === 0) {
+              core.info('No form labels detected — skipping');
+              return;
+            }
+
+            // Skip labels already on the issue
+            const existing = (context.payload.issue.labels || []).map(l => l.name);
+            const toAdd = labels.filter(l => !existing.includes(l));
+
+            if (toAdd.length === 0) {
+              core.info('All labels already applied');
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: toAdd,
+            });
+
+            core.info(`Applied labels: ${toAdd.join(', ')}`);

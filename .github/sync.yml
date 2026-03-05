@@ -83,6 +83,8 @@ group:
         dest: .github/workflows/branch-cleanup.yml
       - source: .github/workflows/codex-pr-review.yml
         dest: .github/workflows/codex-pr-review.yml
+      - source: .github/workflows/issue-label.yml
+        dest: .github/workflows/issue-label.yml
     repos: |
       qws941/aimo3-prize
       qws941/blacklist

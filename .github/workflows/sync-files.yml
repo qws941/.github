@@ -35,6 +35,7 @@ on:
       - '.github/ISSUE_TEMPLATE/feature_request.yml'
       - '.github/ISSUE_TEMPLATE/issue-form.yml'
       - '.github/ISSUE_TEMPLATE/config.yml'
+      - '.github/workflows/issue-label.yml'
   workflow_dispatch:
 
 jobs:
