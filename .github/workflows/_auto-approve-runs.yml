@@ -2,7 +2,7 @@
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
 # Event-driven: triggered by sync PR events, not cron polling.
-# Approves action_required workflow runs and reruns stale failures.
+# Reruns action_required workflow runs and stale failures.
 #
 # Required secrets:
 #   - GH_PAT: GitHub PAT with actions:write permission
@@ -21,16 +21,17 @@ jobs:
       - name: Wait for workflow runs to queue
         run: sleep 15
 
-      - name: Approve action_required runs and rerun stale failures
+      - name: Rerun action_required runs and stale failures
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           github-token: ${{ secrets.GH_PAT || github.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            let approved = 0;
-            let rerun = 0;
+            let rerunPending = 0;
+            let rerunFailed = 0;
 
+            // Rerun action_required runs (approve API only works for fork PRs)
             try {
               const { data: pendingRuns } = await github.rest.actions.listWorkflowRunsForRepo({
                 owner,
@@ -41,21 +42,22 @@ jobs:
 
               for (const run of pendingRuns.workflow_runs) {
                 try {
-                  await github.rest.actions.approveWorkflowRun({
+                  await github.rest.actions.reRunWorkflow({
                     owner,
                     repo,
                     run_id: run.id,
                   });
-                  approved++;
-                  core.info(`Approved run #${run.id} (${run.name})`);
+                  rerunPending++;
+                  core.info(`Rerun action_required run #${run.id} (${run.name})`);
                 } catch (e) {
-                  core.warning(`Failed to approve run #${run.id}: ${e.message}`);
+                  core.warning(`Failed to rerun action_required run #${run.id}: ${e.message}`);
                 }
               }
             } catch (e) {
               core.warning(`Failed to list action_required runs: ${e.message}`);
             }
 
+            // Rerun stale failures from the last 24h
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             try {
               const { data: failedRuns } = await github.rest.actions.listWorkflowRunsForRepo({
@@ -78,7 +80,7 @@ jobs:
                     repo,
                     run_id: run.id,
                   });
-                  rerun++;
+                  rerunFailed++;
                   core.info(`Rerun failed jobs for run #${run.id} (${run.name})`);
                 } catch (e) {
                   core.warning(`Failed to rerun #${run.id}: ${e.message}`);
@@ -88,4 +90,4 @@ jobs:
               core.warning(`Failed to list failed runs: ${e.message}`);
             }
 
-            core.info(`Done: ${approved} approved, ${rerun} rerun`);
+            core.info(`Done: ${rerunPending} action_required rerun, ${rerunFailed} failure rerun`);
