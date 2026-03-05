@@ -69,3 +69,19 @@ jobs:
             } catch (error) {
               core.warning(`Failed to assign Codex: ${error.message}`);
             }
+
+            // Remove repo owner from assignees (Codex-only policy)
+            try {
+              const { data: repoData } = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              await github.rest.issues.removeAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                assignees: [repoData.owner.login],
+              });
+            } catch (error) {
+              core.warning(`Failed to remove owner assignee: ${error.message}`);
+            }
