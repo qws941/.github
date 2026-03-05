@@ -46,3 +46,4 @@ jobs:
           COMMIT_PREFIX: "chore: "
           PR_LABELS: "sync"
           COMMIT_EACH_FILE: false
+          SKIP_PR: true
