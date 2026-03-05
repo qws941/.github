@@ -41,7 +41,8 @@ jobs:
         contains(github.event.issue.title, '[Secret') ||
         contains(github.event.issue.title, '[MCP') ||
         contains(github.event.issue.title, '[Cloudflare') ||
-        contains(github.event.issue.title, '[Terraform')
+        contains(github.event.issue.title, '[Terraform') ||
+        contains(github.event.issue.title, 'Security Scan')
       )) ||
       (github.event.action == 'labeled' &&
         github.event.label.name != 'codex' && (
@@ -49,7 +50,8 @@ jobs:
         github.event.label.name == 'health' ||
         github.event.label.name == 'infrastructure' ||
         github.event.label.name == 'ci-failure' ||
-        github.event.label.name == 'drift'
+        github.event.label.name == 'drift' ||
+        github.event.label.name == 'security'
       ))
     steps:
       - name: Check for existing Codex comment
