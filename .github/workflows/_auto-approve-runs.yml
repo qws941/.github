@@ -68,11 +68,19 @@ jobs:
                 per_page: 50,
               });
 
-              const syncRuns = failedRuns.workflow_runs.filter(
-                r => r.actor?.login === 'github-actions[bot]' || r.actor?.login === context.repo.owner
+              const trustedActors = new Set([
+                'github-actions[bot]',
+                'dependabot[bot]',
+                'chatgpt-codex-connector[bot]',
+                'openai-code-agent[bot]',
+                context.repo.owner,
+              ]);
+
+              const eligibleRuns = failedRuns.workflow_runs.filter(
+                r => trustedActors.has(r.actor?.login)
               );
 
-              for (const run of syncRuns) {
+              for (const run of eligibleRuns) {
                 if (run.run_attempt > 1) continue;
                 try {
                   await github.rest.actions.reRunWorkflowFailedJobs({
