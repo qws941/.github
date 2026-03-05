@@ -47,16 +47,12 @@ jobs:
           script: |
             const title = context.payload.issue.title;
             const body = context.payload.issue.body || '';
+            const commentBody = ['@codex', '', '**Task:** ' + title, '', '**Context:**', body].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `@codex
-
-**Task:** ${title}
-
-**Context:**
-${body}`
+              body: commentBody,
             });
 
             // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
