@@ -153,3 +153,11 @@ jobs:
             } catch (error) {
               core.warning(`Failed to assign Codex: ${error.message}`);
             }
+
+            // Add 'codex' label for tracking and downstream triggers
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['codex'],
+            });

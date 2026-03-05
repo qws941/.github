@@ -24,7 +24,23 @@ jobs:
       group: codex-issue-${{ github.event.issue.number }}
       cancel-in-progress: false
     steps:
+      - name: Check for existing Codex comment
+        id: dedup
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          result-encoding: string
+          script: |
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const hasCodex = comments.data.some(c => c.body.includes('@codex'));
+            return hasCodex ? 'skip' : 'proceed';
+
       - name: Comment and assign Codex
+        if: steps.dedup.outputs.result == 'proceed'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           github-token: ${{ secrets.GH_PAT }}
@@ -35,7 +51,12 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `@codex\n\n**Task:** ${title}\n\n**Context:**\n${body}`
+              body: `@codex
+
+**Task:** ${title}
+
+**Context:**
+${body}`
             });
 
             // Assign Codex bot via GraphQL (REST silently ignores bot accounts)
