@@ -8,8 +8,7 @@
 #   - Callers reference templates via: uses: qws941/.github/.github/workflows/_*.yml@master
 #
 # Synced files (truly common across all repos):
-#   - OWNERS, LICENSE, .editorconfig (governance)
-#   - AGENTS.md (project knowledge base)
+#   - OWNERS, LICENSE, .editorconfig, AGENTS.md (governance)
 #   - .github/FUNDING.yml, PULL_REQUEST_TEMPLATE.md (community)
 #   - .github/ISSUE_TEMPLATE/* (bug report, feature request, issue form, config)
 #   - .github/labeler.yml, release-drafter.yml (PR config)
@@ -23,6 +22,7 @@
 group:
   # Group 1: Core governance + workflow callers → all owned repos
   - files:
+      # --- Governance ---
       - source: OWNERS
         dest: OWNERS
       - source: LICENSE
@@ -31,60 +31,63 @@ group:
         dest: .editorconfig
       - source: AGENTS.md
         dest: AGENTS.md
-      - source: .github/labeler.yml
-        dest: .github/labeler.yml
-      - source: .github/release-drafter.yml
-        dest: .github/release-drafter.yml
+      # --- GitHub config ---
       - source: .github/FUNDING.yml
         dest: .github/FUNDING.yml
       - source: .github/PULL_REQUEST_TEMPLATE.md
         dest: .github/PULL_REQUEST_TEMPLATE.md
+      - source: .github/labeler.yml
+        dest: .github/labeler.yml
+      - source: .github/release-drafter.yml
+        dest: .github/release-drafter.yml
+      # --- Issue templates ---
       - source: .github/ISSUE_TEMPLATE/bug_report.yml
         dest: .github/ISSUE_TEMPLATE/bug_report.yml
+      - source: .github/ISSUE_TEMPLATE/config.yml
+        dest: .github/ISSUE_TEMPLATE/config.yml
       - source: .github/ISSUE_TEMPLATE/feature_request.yml
         dest: .github/ISSUE_TEMPLATE/feature_request.yml
       - source: .github/ISSUE_TEMPLATE/issue-form.yml
         dest: .github/ISSUE_TEMPLATE/issue-form.yml
-      - source: .github/ISSUE_TEMPLATE/config.yml
-        dest: .github/ISSUE_TEMPLATE/config.yml
-      - source: .github/workflows/stale.yml
-        dest: .github/workflows/stale.yml
-      - source: .github/workflows/labeler.yml
-        dest: .github/workflows/labeler.yml
+      # --- Workflow callers (alphabetical) ---
+      - source: .github/workflows/auto-approve-runs.yml
+        dest: .github/workflows/auto-approve-runs.yml
+      - source: .github/workflows/auto-merge.yml
+        dest: .github/workflows/auto-merge.yml
+      - source: .github/workflows/branch-cleanup.yml
+        dest: .github/workflows/branch-cleanup.yml
+      - source: .github/workflows/ci-notify-failure.yml
+        dest: .github/workflows/ci-notify-failure.yml
+      - source: .github/workflows/codex-auto-issue.yml
+        dest: .github/workflows/codex-auto-issue.yml
+      - source: .github/workflows/codex-issue-timeout.yml
+        dest: .github/workflows/codex-issue-timeout.yml
+      - source: .github/workflows/codex-pr-normalize.yml
+        dest: .github/workflows/codex-pr-normalize.yml
+      - source: .github/workflows/codex-pr-review.yml
+        dest: .github/workflows/codex-pr-review.yml
       - source: .github/workflows/codex-triage.yml
         dest: .github/workflows/codex-triage.yml
-      - source: .github/workflows/welcome.yml
-        dest: .github/workflows/welcome.yml
-      - source: .github/workflows/lock-threads.yml
-        dest: .github/workflows/lock-threads.yml
       - source: .github/workflows/commitlint.yml
         dest: .github/workflows/commitlint.yml
+      - source: .github/workflows/dependabot-auto-fix.yml
+        dest: .github/workflows/dependabot-auto-fix.yml
+      - source: .github/workflows/issue-label.yml
+        dest: .github/workflows/issue-label.yml
+      - source: .github/workflows/issue-lifecycle.yml
+        dest: .github/workflows/issue-lifecycle.yml
+      - source: .github/workflows/labeler.yml
+        dest: .github/workflows/labeler.yml
+      - source: .github/workflows/lock-threads.yml
+        dest: .github/workflows/lock-threads.yml
       - source: .github/workflows/pr-size.yml
         dest: .github/workflows/pr-size.yml
       - source: .github/workflows/release-drafter.yml
         dest: .github/workflows/release-drafter.yml
-      - source: .github/workflows/auto-merge.yml
-        dest: .github/workflows/auto-merge.yml
-      - source: .github/workflows/codex-auto-issue.yml
-        dest: .github/workflows/codex-auto-issue.yml
-      - source: .github/workflows/issue-lifecycle.yml
-        dest: .github/workflows/issue-lifecycle.yml
-      - source: .github/workflows/ci-notify-failure.yml
-        dest: .github/workflows/ci-notify-failure.yml
-      - source: .github/workflows/auto-approve-runs.yml
-        dest: .github/workflows/auto-approve-runs.yml
-      - source: .github/workflows/dependabot-auto-fix.yml
-        dest: .github/workflows/dependabot-auto-fix.yml
-      - source: .github/workflows/codex-pr-normalize.yml
-        dest: .github/workflows/codex-pr-normalize.yml
-      - source: .github/workflows/codex-issue-timeout.yml
-        dest: .github/workflows/codex-issue-timeout.yml
-      - source: .github/workflows/branch-cleanup.yml
-        dest: .github/workflows/branch-cleanup.yml
-      - source: .github/workflows/codex-pr-review.yml
-        dest: .github/workflows/codex-pr-review.yml
-      - source: .github/workflows/issue-label.yml
-        dest: .github/workflows/issue-label.yml
+      - source: .github/workflows/stale.yml
+        dest: .github/workflows/stale.yml
+      - source: .github/workflows/welcome.yml
+        dest: .github/workflows/welcome.yml
     repos: |
       qws941/aimo3-prize
       qws941/blacklist
