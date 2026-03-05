@@ -73,6 +73,7 @@ jobs:
                 'dependabot[bot]',
                 'chatgpt-codex-connector[bot]',
                 'openai-code-agent[bot]',
+                'Codex',
                 context.repo.owner,
               ]);
 
