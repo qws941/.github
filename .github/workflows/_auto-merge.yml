@@ -1,6 +1,9 @@
 # Reusable Auto-Merge Workflow
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
+# Uses --auto to queue merge pending CI status checks.
+# This prevents merging broken PRs (e.g., Codex fixes that fail CI).
+#
 # Usage:
 #   jobs:
 #     auto-merge:
@@ -8,7 +11,7 @@
 #       secrets: inherit
 #
 # Required secrets:
-#   - GH_PAT: GitHub Personal Access Token with admin bypass permissions
+#   - GH_PAT: GitHub Personal Access Token with repo permissions
 
 name: Auto Merge
 
@@ -29,8 +32,14 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'codex') ||
       contains(github.event.pull_request.labels.*.name, 'sync')
     steps:
-      - name: Merge
+      - name: Approve
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge "$PR_URL" --squash --admin
+        run: gh pr review "$PR_URL" --approve
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge "$PR_URL" --squash --auto
