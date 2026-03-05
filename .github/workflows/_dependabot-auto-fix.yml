@@ -1,0 +1,126 @@
+# Reusable Dependabot Auto-Fix Workflow
+# SSoT: qws941/.github — do not duplicate in consuming repos
+#
+# Checks for open Dependabot security alerts that cannot be auto-fixed,
+# creates issues with context, and labels them 'codex' so the Codex
+# pipeline automatically investigates and creates fix PRs.
+#
+# Usage:
+#   jobs:
+#     dependabot-fix:
+#       uses: qws941/.github/.github/workflows/_dependabot-auto-fix.yml@master
+
+name: Dependabot Auto-Fix
+
+on:
+  workflow_call:
+
+jobs:
+  check-alerts:
+    name: Escalate unfixable Dependabot alerts to Codex
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check for unfixable Dependabot alerts
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            // Fetch open Dependabot alerts
+            let alerts;
+            try {
+              const response = await github.rest.dependabot.listAlertsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+              });
+              alerts = response.data;
+            } catch (error) {
+              if (error.status === 403 || error.status === 404) {
+                core.info('Dependabot alerts not enabled or accessible for this repo. Skipping.');
+                return;
+              }
+              throw error;
+            }
+
+            if (!alerts || alerts.length === 0) {
+              core.info('No open Dependabot alerts found.');
+              return;
+            }
+
+            // Get existing issues to avoid duplicates
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'codex',
+              per_page: 100,
+            });
+            const existingTitles = existingIssues.data.map(i => i.title);
+
+            for (const alert of alerts) {
+              const pkg = alert.security_vulnerability?.package?.name || alert.dependency?.package?.name || 'unknown';
+              const ecosystem = alert.security_vulnerability?.package?.ecosystem || alert.dependency?.package?.ecosystem || '';
+              const severity = alert.security_advisory?.severity || 'unknown';
+              const summary = alert.security_advisory?.summary || 'No summary available';
+              const ghsaId = alert.security_advisory?.ghsa_id || '';
+              const cveId = (alert.security_advisory?.cve_id) || '';
+              const vulnerableRange = alert.security_vulnerability?.vulnerable_version_range || '';
+              const firstPatchedVersion = alert.security_vulnerability?.first_patched_version?.identifier || 'none available';
+
+              const issueTitle = `[Dependabot] Fix ${pkg} vulnerability (${severity})`;
+
+              // Dedup: skip if issue with same title already exists
+              if (existingTitles.some(t => t === issueTitle)) {
+                core.info(`Issue already exists for ${pkg}. Skipping.`);
+                continue;
+              }
+
+              const issueBody = [
+                `## Dependabot Security Alert — Manual Fix Required`,
+                '',
+                `Dependabot cannot automatically resolve this vulnerability. Codex is requested to investigate and create a fix PR.`,
+                '',
+                `### Alert Details`,
+                '',
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| **Package** | \`${pkg}\` (${ecosystem}) |`,
+                `| **Severity** | ${severity} |`,
+                `| **Vulnerable range** | \`${vulnerableRange}\` |`,
+                `| **First patched version** | \`${firstPatchedVersion}\` |`,
+                `| **GHSA** | ${ghsaId ? `[${ghsaId}](https://github.com/advisories/${ghsaId})` : 'N/A'} |`,
+                `| **CVE** | ${cveId || 'N/A'} |`,
+                '',
+                `### Summary`,
+                '',
+                summary,
+                '',
+                `### Suggested Fix Steps`,
+                '',
+                `1. Update \`${pkg}\` to \`>=${firstPatchedVersion}\` in \`package.json\` (or add an \`overrides\` entry if a transitive dependency)`,
+                `2. Run \`npm install\` to regenerate \`package-lock.json\``,
+                `3. Verify the resolved version with \`npm ls ${pkg}\``,
+                `4. Run tests to ensure nothing is broken`,
+                `5. Create a PR with the fix`,
+                '',
+                `### References`,
+                '',
+                `- [Dependabot alert #${alert.number}](${alert.html_url})`,
+              ].join('\n');
+
+              // Create the issue
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['codex', 'type:security'],
+              });
+
+              core.info(`Created issue #${issue.number} for ${pkg}`);
+
+              // Rate limit: small delay between issue creations
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }

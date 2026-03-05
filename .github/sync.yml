@@ -73,6 +73,8 @@ group:
         dest: .github/workflows/ci-notify-failure.yml
       - source: .github/workflows/auto-approve-runs.yml
         dest: .github/workflows/auto-approve-runs.yml
+      - source: .github/workflows/dependabot-auto-fix.yml
+        dest: .github/workflows/dependabot-auto-fix.yml
     repos: |
       qws941/aimo3-prize
       qws941/blacklist
