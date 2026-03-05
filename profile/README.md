@@ -63,7 +63,7 @@ All repositories adhere to:
 - **Conventional commits** (`type(scope): description`)
 - **CODEOWNERS** for required code review
 - **Dependabot** for automated dependency updates
-- **Branch rulesets** with linear history enforcement
+- **Branch protection** with linear history enforcement
 
 See [CONTRIBUTING.md](https://github.com/qws941/.github/blob/master/CONTRIBUTING.md)
 for full conventions.

@@ -100,7 +100,7 @@ These practices are enforced across all repositories:
 | ---------------------------------- | ----------------------------------- |
 | Dependency scanning                | Dependabot alerts + security fixes  |
 | Secret scanning                    | GitHub secret scanning enabled      |
-| Branch protection                  | Rulesets with linear history required |
+| Branch protection                  | CODEOWNERS required reviews          |
 | Code review                        | CODEOWNERS required reviews         |
 | No hardcoded secrets               | Vault, env vars, or `.env.example`  |
-| Signed commits (terraform repo)    | Required signatures via ruleset     |
+| Signed commits (terraform repo)    | Required signatures via branch rules |
