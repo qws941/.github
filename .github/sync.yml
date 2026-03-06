@@ -8,7 +8,7 @@
 #   - Callers reference templates via: uses: qws941/.github/.github/workflows/_*.yml@master
 #
 # Synced files (truly common across all repos):
-#   - OWNERS, LICENSE, .editorconfig, AGENTS.md (governance)
+#   - OWNERS, LICENSE, .editorconfig (governance)
 #   - .github/FUNDING.yml, PULL_REQUEST_TEMPLATE.md (community)
 #   - .github/ISSUE_TEMPLATE/* (bug report, feature request, issue form, config)
 #   - .github/labeler.yml, release-drafter.yml (PR config)
@@ -29,8 +29,6 @@ group:
         dest: LICENSE
       - source: .editorconfig
         dest: .editorconfig
-      - source: AGENTS.md
-        dest: AGENTS.md
       # --- GitHub config ---
       - source: .github/FUNDING.yml
         dest: .github/FUNDING.yml

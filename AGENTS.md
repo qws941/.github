@@ -119,7 +119,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 
 This repo is the canonical source. Changes propagate automatically:
 
-- **Sync trigger**: Push to `master` on paths: `OWNERS`, `AGENTS.md`, `LICENSE`, `.editorconfig`, `.github/sync.yml`, `.github/FUNDING.yml`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/labeler.yml`, `.github/release-drafter.yml`, `.github/ISSUE_TEMPLATE/*`, `.github/workflows/{auto-approve-runs,auto-merge,branch-cleanup,ci-notify-failure,codex-auto-issue,codex-issue-timeout,codex-pr-normalize,codex-pr-review,codex-triage,commitlint,dependabot-auto-fix,issue-label,issue-lifecycle,labeler,lock-threads,pr-size,release-drafter,stale,welcome}.yml`; manual `workflow_dispatch` available via `sync-files.yml`
+- **Sync trigger**: Push to `master` on paths: `OWNERS`, `LICENSE`, `.editorconfig`, `.github/sync.yml`, `.github/FUNDING.yml`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/labeler.yml`, `.github/release-drafter.yml`, `.github/ISSUE_TEMPLATE/*`, `.github/workflows/{auto-approve-runs,auto-merge,branch-cleanup,ci-notify-failure,codex-auto-issue,codex-issue-timeout,codex-pr-normalize,codex-pr-review,codex-triage,commitlint,dependabot-auto-fix,issue-label,issue-lifecycle,labeler,lock-threads,pr-size,release-drafter,stale,welcome}.yml`; manual `workflow_dispatch` available via `sync-files.yml`
 - **Sync engine**: `BetaHuhn/repo-file-sync-action` via `.github/workflows/sync-files.yml`
 - **Sync mode**: Direct push (`SKIP_PR: true`), commit prefix `chore: `, no PR created
 
@@ -130,7 +130,6 @@ This repo is the canonical source. Changes propagate automatically:
 | `OWNERS`                                     | All 14 repos |
 | `LICENSE`                                     | All 14 repos |
 | `.editorconfig`                               | All 14 repos |
-| `AGENTS.md`                                   | All 14 repos |
 | `.github/FUNDING.yml`                         | All 14 repos |
 | `.github/PULL_REQUEST_TEMPLATE.md`            | All 14 repos |
 | `.github/labeler.yml`                         | All 14 repos |
@@ -161,6 +160,7 @@ This repo is the canonical source. Changes propagate automatically:
 
 **NOT synced** (repo-specific by design):
 
+- `AGENTS.md` — each repo maintains its own project knowledge base
 - `.github/dependabot.yml` — different ecosystems per repo
 - `.github/CODEOWNERS` — terraform has custom path rules
 
@@ -252,7 +252,7 @@ jobs:
 - Codex reads `AGENTS.md` at repo root automatically — no additional config needed.
 - `## Review guidelines` section (below) customizes review behavior.
 - Enable automatic reviews per-repo at `chatgpt.com/codex/settings/code-review`.
-- AGENTS.md is synced to all 14 repos via `sync.yml` Group 1.
+- AGENTS.md is **not synced** — each repo maintains its own. Only the `## Review guidelines` section is universal.
 - Codex Environment must be created per-repo at `chatgpt.com/codex/settings/environments` (web UI only, no API).
 - **Known limitation**: Rapid-fire `@codex` mentions (multiple within seconds) may hit rate limits and receive no response. Space out mentions or retry individually.
 
@@ -320,7 +320,7 @@ Path-based labels defined in `.github/labeler.yml`:
 - All GitHub Actions must be SHA-pinned with `# vN` version comment — flag any mutable tag (`@v4`).
 - Never approve PRs that add `as any`, `@ts-ignore`, `@ts-expect-error`, or empty `catch {}` blocks.
 - Never approve PRs that hardcode IPs, secrets, or credentials.
-- Synced files (OWNERS, LICENSE, .editorconfig, AGENTS.md, labeler.yml, workflow files) must remain generic — flag any repo-specific content.
+- Synced files (OWNERS, LICENSE, .editorconfig, labeler.yml, workflow files) must remain generic — flag any repo-specific content.
 - PR size should be ~200 LOC max. Flag PRs exceeding 400 LOC.
 - Squash merge only — flag merge commits or rebase merges.
 - Trunk-based development — flag long-lived feature branches.
@@ -380,6 +380,6 @@ go run scripts/onboard-repo.go --repo qws941/new-repo --dry-run
 - Secrets required: `GH_PAT` for sync-files and auto-merge workflows, `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` for CF Worker deploy workflow.
 - Variables required: `ELASTICSEARCH_URL` (repo variable) for ELK ingest workflow. Optional secret: `ELASTICSEARCH_API_KEY`.
 - `chatgpt-codex-connector` GitHub App installed with all-repo access. `@codex review` works in any repo PR. Issue-context `@codex` mentions require a Codex Environment configured per-repo at `chatgpt.com/codex/settings/environments`. Rapid-fire mentions may hit rate limits.
-- AGENTS.md is synced to all downstream repos — Codex reads it automatically for review context in every repo.
+- AGENTS.md is NOT synced — each repo maintains its own project knowledge base. Codex reads the repo-local AGENTS.md automatically.
 - GH_PAT is used in `auto-merge.yml` for PR approval and auto-merge queueing (waits for CI to pass before merging).
 - `auto-approve-runs.yml` is triggered via `workflow_dispatch` only. Detects action_required runs from Codex/bot PRs and reruns them via API. No cron or external polling needed.

@@ -8,7 +8,6 @@ on:
       - 'OWNERS'
       - 'LICENSE'
       - '.editorconfig'
-      - 'AGENTS.md'
       # GitHub config
       - '.github/sync.yml'
       - '.github/FUNDING.yml'
