@@ -145,6 +145,24 @@ jobs:
               per_page: 100,
             });
             const totalChanges = prFiles.reduce((sum, f) => sum + f.changes, 0);
+
+            // Close empty PRs automatically (0 changes)
+            if (totalChanges === 0) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed',
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: '🚫 **Empty PR** — This PR contains no changes. Closing automatically.\n\nIf this was unintentional, please re-open with actual changes.',
+              });
+              console.log('Closed empty PR (0 changes)');
+              return;
+            }
             if (totalChanges > 500) {
               // Remove auto-merge label for oversized PRs
               try {

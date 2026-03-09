@@ -31,6 +31,16 @@ jobs:
             let rerunPending = 0;
             let rerunFailed = 0;
 
+            const trustedActors = new Set([
+              'github-actions[bot]',
+              'dependabot[bot]',
+              'chatgpt-codex-connector[bot]',
+              'openai-code-agent[bot]',
+              'codex[bot]',
+              'Codex',
+              context.repo.owner,
+            ]);
+
             // Rerun action_required runs (approve API only works for fork PRs)
             try {
               const { data: pendingRuns } = await github.rest.actions.listWorkflowRunsForRepo({
@@ -40,17 +50,17 @@ jobs:
                 per_page: 100,
               });
 
-              for (const run of pendingRuns.workflow_runs) {
+              for (const run of pendingRuns.workflow_runs.filter(r => trustedActors.has(r.actor?.login))) {
                 try {
-                  await github.rest.actions.reRunWorkflow({
+                  await github.rest.actions.approveWorkflowRun({
                     owner,
                     repo,
                     run_id: run.id,
                   });
                   rerunPending++;
-                  core.info(`Rerun action_required run #${run.id} (${run.name})`);
+                  core.info(`Approved action_required run #${run.id} (${run.name})`);
                 } catch (e) {
-                  core.warning(`Failed to rerun action_required run #${run.id}: ${e.message}`);
+                  core.warning(`Failed to approve action_required run #${run.id}: ${e.message}`);
                 }
               }
             } catch (e) {
@@ -68,14 +78,6 @@ jobs:
                 per_page: 50,
               });
 
-              const trustedActors = new Set([
-                'github-actions[bot]',
-                'dependabot[bot]',
-                'chatgpt-codex-connector[bot]',
-                'openai-code-agent[bot]',
-                'Codex',
-                context.repo.owner,
-              ]);
 
               const eligibleRuns = failedRuns.workflow_runs.filter(
                 r => trustedActors.has(r.actor?.login)
@@ -99,4 +101,4 @@ jobs:
               core.warning(`Failed to list failed runs: ${e.message}`);
             }
 
-            core.info(`Done: ${rerunPending} action_required rerun, ${rerunFailed} failure rerun`);
+            core.info(`Done: ${rerunPending} action_required approved, ${rerunFailed} failure rerun`);
