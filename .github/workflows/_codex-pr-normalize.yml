@@ -8,13 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.pull_request.user.login == 'Codex' ||
+      github.event.pull_request.user.login == 'codex[bot]' ||
       github.event.pull_request.user.login == 'openai-code-agent[bot]' ||
-      github.event.pull_request.user.login == 'chatgpt-codex-connector[bot]'
+      github.event.pull_request.user.login == 'chatgpt-codex-connector[bot]' ||
+      startsWith(github.event.pull_request.head.ref, 'codex/')
     steps:
       - name: Normalize PR title and link issues
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.GH_PAT || github.token }}
           script: |
             const pr = context.payload.pull_request;
             const title = pr.title;
@@ -133,4 +135,79 @@ jobs:
                 }
               `, { id: pr.node_id });
               console.log('Marked PR as ready for review (was draft)');
+            }
+
+            // Check PR diff size — block auto-merge for oversized PRs
+            const { data: prFiles } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const totalChanges = prFiles.reduce((sum, f) => sum + f.changes, 0);
+            if (totalChanges > 500) {
+              // Remove auto-merge label for oversized PRs
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  name: 'auto-merge'
+                });
+                console.log(`Removed auto-merge label — PR exceeds 500 LOC (${totalChanges})`);
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
+
+              // Add warning comment if not already posted
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 50,
+              });
+              const hasWarning = comments.some(c => c.body?.includes('⚠️ **Oversized PR**'));
+              if (!hasWarning) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: '⚠️ **Oversized PR** — This PR changes ' + totalChanges + ' lines (threshold: 500). Auto-merge disabled.\n\nPlease review manually or request Codex to split into smaller PRs.'
+                });
+                console.log(`Added size warning comment (${totalChanges} LOC)`);
+              }
+            }
+
+            // Detect and close duplicate PRs targeting the same issue
+            if (linkedIssue) {
+              const { data: allPRs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+              });
+
+              const dupeRe = new RegExp(`(?:Closes|Fixes|Resolves)\\s+#${linkedIssue.number}\\b`, 'i');
+              const duplicates = allPRs.filter(p =>
+                p.number !== pr.number && p.body && dupeRe.test(p.body)
+              );
+
+              for (const dup of duplicates) {
+                // Close older duplicates, keep the newest
+                if (new Date(dup.created_at) < new Date(pr.created_at)) {
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: dup.number,
+                    state: 'closed',
+                  });
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: dup.number,
+                    body: `Superseded by #${pr.number} — closing duplicate.`,
+                  });
+                  console.log(`Closed duplicate PR #${dup.number}`);
+                }
+              }
             }

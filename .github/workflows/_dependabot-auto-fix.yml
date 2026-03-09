@@ -49,15 +49,44 @@ jobs:
               return;
             }
 
-            // Get existing issues to avoid duplicates
-            const existingIssues = await github.rest.issues.listForRepo({
+            // Get existing open issues to avoid duplicates
+            const openIssues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'codex',
               per_page: 100,
             });
-            const existingTitles = existingIssues.data.map(i => i.title);
+
+            // Get recently closed issues (last 30 days) to avoid reopening
+            const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            const closedIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              labels: 'codex',
+              since,
+              per_page: 100,
+            });
+
+            const allIssueTitles = [
+              ...openIssues.data.map(i => i.title),
+              ...closedIssues.data.map(i => i.title),
+            ];
+
+            // Get open PRs to check for in-flight fixes
+            const openPRs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const prTexts = openPRs.data.map(p =>
+              `${p.title} ${p.body || ''}`.toLowerCase()
+            );
+
+            // Track packages processed in this run to deduplicate multiple advisories
+            const seen = new Set();
 
             for (const alert of alerts) {
               const pkg = alert.security_vulnerability?.package?.name || alert.dependency?.package?.name || 'unknown';
@@ -69,13 +98,28 @@ jobs:
               const vulnerableRange = alert.security_vulnerability?.vulnerable_version_range || '';
               const firstPatchedVersion = alert.security_vulnerability?.first_patched_version?.identifier || 'none available';
 
-              const issueTitle = `[Dependabot] Fix ${pkg} vulnerability (${ghsaId || severity})`;
-
-              // Dedup: skip if issue with same title already exists
-              if (existingTitles.some(t => t === issueTitle)) {
-                core.info(`Issue already exists for ${pkg}. Skipping.`);
+              // Per-run dedup: one issue per package per run
+              if (seen.has(pkg)) {
+                core.info(`Already processed ${pkg} in this run. Skipping duplicate alert.`);
                 continue;
               }
+              seen.add(pkg);
+
+              // Dedup against existing issues by package name (ignores GHSA ID / severity suffix)
+              const titlePrefix = `[Dependabot] Fix ${pkg} vulnerability`;
+              if (allIssueTitles.some(t => t.startsWith(titlePrefix))) {
+                core.info(`Issue already exists for ${pkg} (open or recently closed). Skipping.`);
+                continue;
+              }
+
+              // Dedup against open PRs already fixing this package
+              const pkgLower = pkg.toLowerCase();
+              if (prTexts.some(t => t.includes(pkgLower))) {
+                core.info(`Open PR already addresses ${pkg}. Skipping issue creation.`);
+                continue;
+              }
+
+              const issueTitle = `[Dependabot] Fix ${pkg} vulnerability (${severity})`;
 
               const issueBody = [
                 `## Dependabot Security Alert — Manual Fix Required`,
