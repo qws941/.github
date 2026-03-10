@@ -240,7 +240,7 @@ jobs:
 | `codex-triage.yml` | `issues: opened` | Filters title for failure/deploy/build/docker keywords → posts `@codex` investigate comment |
 | `codex-auto-issue.yml` | `issues: labeled` with `codex` label | Posts `@codex` comment with issue title and body context |
 | `dependabot-auto-fix.yml` | `schedule` (Monday 03:00 UTC) + `workflow_dispatch` | Fetches open Dependabot alerts, deduplicates, creates codex-labeled issues → triggers codex-auto-issue pipeline |
-| `automation-health.yml` | `workflow_run: completed` + `workflow_dispatch` | Monitors shared workflow health and opens repo-local health issues |
+| `automation-health.yml` | `workflow_run: completed` + `workflow_dispatch` | Monitors repo-local shared workflow health and opens current health issues |
 | `codex-pr-normalize.yml` | `pull_request_target: opened, edited` | Normalizes Codex PR title to conventional commit, adds labels, undrafts |
 | `codex-pr-review.yml` | `pull_request_target: opened, synchronize` | Auto-reviews PRs via @codex |
 | `codex-issue-timeout.yml` | `schedule` + `workflow_dispatch` | Closes stale Codex-assigned issues after timeout |
@@ -271,7 +271,7 @@ GitHub offers native third-party coding agents (OpenAI Codex, Anthropic Claude) 
 
 The `codex-triage.yml` and `codex-auto-issue.yml` workflows post `@codex` comments on issues. The connector app responds when a Codex Environment is configured for the repo. Rapid-fire mentions across multiple issues may hit rate limits — the bot silently drops responses in that case.
 
-`downstream-automation-audit.yml` runs only in `qws941/.github` and scans all sync target repos for missing, disabled, or unhealthy shared automation workflows, then registers findings as upstream issues.
+`downstream-automation-audit.yml` runs only in `qws941/.github` and scans all sync target repos for missing, disabled, or unhealthy shared automation workflows after sync and on schedule, then registers findings as upstream issues.
 
 ### GitHub Actions
 
