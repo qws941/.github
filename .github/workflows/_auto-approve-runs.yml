@@ -7,7 +7,7 @@
 # Required secrets:
 #   - GH_PAT: GitHub PAT with actions:write permission
 
-name: Auto Approve Runs
+name: Auto Approve Runs (Reusable)
 
 on:
   workflow_call:

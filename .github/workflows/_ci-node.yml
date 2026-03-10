@@ -11,7 +11,7 @@
 #         run-test: true
 #       secrets: inherit
 
-name: Node.js CI
+name: Node.js CI (Reusable)
 
 on:
   workflow_call:

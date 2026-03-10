@@ -6,7 +6,7 @@
 #     commitlint:
 #       uses: qws941/.github/.github/workflows/_commitlint.yml@master
 
-name: Commit Lint
+name: Commit Lint (Reusable)
 
 on:
   workflow_call:

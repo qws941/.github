@@ -6,7 +6,7 @@
 #     pr-size:
 #       uses: qws941/.github/.github/workflows/_pr-size.yml@master
 
-name: PR Size
+name: PR Size (Reusable)
 
 on:
   workflow_call:

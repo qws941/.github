@@ -13,7 +13,7 @@
 # Required secrets:
 #   - GH_PAT: GitHub Personal Access Token with repo permissions
 
-name: Auto Merge
+name: Auto Merge (Reusable)
 
 on:
   workflow_call:

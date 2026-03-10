@@ -11,7 +11,7 @@
 #         run-test: true
 #       secrets: inherit
 
-name: Python CI
+name: Python CI (Reusable)
 
 on:
   workflow_call:
