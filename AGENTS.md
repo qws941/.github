@@ -107,7 +107,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 | Release management          | `.github/workflows/release-drafter.yml`         | Auto-draft release notes from merged PRs         |
 | Release drafter config      | `.github/release-drafter.yml`                   | PR category → changelog section mapping          |
 | Auto-merge workflow         | `.github/workflows/auto-merge.yml`              | Approve + queue squash merge pending CI pass |
-| Auto-approve runs         | `.github/workflows/auto-approve-runs.yml`       | Auto-approve blocked PR workflow runs + manual recovery   |
+| Auto-approve runs         | `.github/workflows/auto-approve-runs.yml`       | PR-targeted approval controller + recovery sweep   |
 | Issue lifecycle           | `.github/workflows/issue-lifecycle.yml`         | Link PRs to issues, auto-close on merge          |
 | Branch cleanup            | `.github/workflows/branch-cleanup.yml`          | Delete merged PR branches                         |
 | CI failure notification   | `.github/workflows/ci-notify-failure.yml`       | Notify + assign Codex bot on CI failure            |
@@ -385,4 +385,4 @@ go run scripts/onboard-repo.go --repo qws941/new-repo --dry-run
 - `chatgpt-codex-connector` GitHub App installed with all-repo access. `@codex review` works in any repo PR. Issue-context `@codex` mentions require a Codex Environment configured per-repo at `chatgpt.com/codex/settings/environments`. Rapid-fire mentions may hit rate limits.
 - AGENTS.md is NOT synced — each repo maintains its own project knowledge base. Codex reads the repo-local AGENTS.md automatically.
 - GH_PAT is used in `auto-merge.yml` for PR approval and auto-merge queueing (waits for CI to pass before merging).
-- `auto-approve-runs.yml` is triggered by blocked PR workflow_run events plus `workflow_dispatch`. It approves trusted PR runs at the workflow gate, excludes non-PR `Issue Lifecycle`/`Welcome` runs, and reruns recent trusted failures via API.
+- `auto-approve-runs.yml` is triggered by `pull_request_target` events for the current PR plus recovery `workflow_dispatch`/`schedule`. It approves trusted blocked PR runs, excludes `Auto Approve Runs` from self-approval, and keeps stale failure reruns in the recovery sweep.
