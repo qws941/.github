@@ -40,8 +40,22 @@ jobs:
               'Codex',
               context.repo.owner,
             ]);
+            const workflowEventAllowlist = new Map([
+              ['Auto Merge', new Set(['pull_request_target'])],
+              ['Codex PR Normalize', new Set(['pull_request_target'])],
+              ['Codex PR Review', new Set(['pull_request'])],
+              ['Commit Lint', new Set(['pull_request_target'])],
+              ['Issue Lifecycle', new Set(['pull_request'])],
+              ['PR Labeler', new Set(['pull_request_target'])],
+              ['PR Size', new Set(['pull_request_target'])],
+              ['Welcome', new Set(['pull_request_target'])],
+            ]);
 
             const isTrustedRun = run => trustedActors.has(run.actor?.login);
+            const isAllowedWorkflowEvent = run => {
+              const allowedEvents = workflowEventAllowlist.get(run.name);
+              return Boolean(allowedEvents && allowedEvents.has(run.event));
+            };
 
             if (triggeringRun) {
               try {
@@ -53,6 +67,11 @@ jobs:
 
                 if (!isTrustedRun(currentRun)) {
                   core.info(`Skipping untrusted triggering run #${currentRun.id} (${currentRun.name})`);
+                  return;
+                }
+
+                if (!isAllowedWorkflowEvent(currentRun)) {
+                  core.info(`Skipping non-PR triggering run #${currentRun.id} (${currentRun.name}, ${currentRun.event})`);
                   return;
                 }
 
