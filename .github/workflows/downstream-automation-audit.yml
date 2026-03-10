@@ -1,0 +1,334 @@
+name: Downstream Automation Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 4 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: downstream-automation-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Audit downstream automation coverage
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          AUDIT_ISSUE_LABELS: 'type:ci,priority:high'
+          AUDIT_SCHEDULE_STALE_DAYS: '10'
+          AUDIT_UNHEALTHY_CONCLUSIONS: 'failure,timed_out,action_required,cancelled'
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const crypto = require('crypto');
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueLabels = (process.env.AUDIT_ISSUE_LABELS || '')
+              .split(',')
+              .map(item => item.trim())
+              .filter(Boolean);
+            const staleDays = Number(process.env.AUDIT_SCHEDULE_STALE_DAYS || '10');
+            const staleMs = staleDays * 24 * 60 * 60 * 1000;
+            const unhealthyConclusions = new Set(
+              (process.env.AUDIT_UNHEALTHY_CONCLUSIONS || '')
+                .split(',')
+                .map(item => item.trim())
+                .filter(Boolean)
+            );
+
+            const syncPath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'sync.yml');
+            const syncContent = fs.readFileSync(syncPath, 'utf8');
+            const reposBlockMatch = syncContent.match(/repos:\s*\|\n((?:\s{6}.+\n?)*)/);
+            if (!reposBlockMatch) {
+              core.setFailed('Unable to parse downstream repos from .github/sync.yml');
+              return;
+            }
+
+            const targetRepos = reposBlockMatch[1]
+              .split('\n')
+              .map(line => line.trim())
+              .filter(Boolean);
+
+            const workflowPathMatches = [...syncContent.matchAll(/source:\s*(\.github\/workflows\/(?!_)[^\s]+)/g)];
+            const workflowPaths = [...new Set(workflowPathMatches.map(match => match[1]))].sort();
+            const upstreamWorkflowMeta = new Map();
+
+            for (const workflowPath of workflowPaths) {
+              const workflowContent = fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, workflowPath), 'utf8');
+              const triggerClass = /\n\s+schedule:/m.test(workflowContent)
+                ? 'schedule'
+                : /\n\s+(pull_request|pull_request_target):/m.test(workflowContent)
+                  ? 'pull_request'
+                  : /\n\s+issues:/m.test(workflowContent)
+                    ? 'issues'
+                    : /\n\s+workflow_run:/m.test(workflowContent)
+                      ? 'workflow_run'
+                      : /\n\s+workflow_dispatch:/m.test(workflowContent)
+                        ? 'workflow_dispatch'
+                        : 'other';
+
+              const upstreamBlob = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: workflowPath,
+                ref: context.sha,
+              });
+
+              upstreamWorkflowMeta.set(workflowPath, {
+                sha: upstreamBlob.data.sha,
+                triggerClass,
+              });
+            }
+
+            const openIssues = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const getExistingIssue = targetRepo => {
+              const marker = `automation-coverage:repo=${targetRepo}`;
+              return openIssues.data.find(issue => (issue.body || '').includes(marker));
+            };
+
+            const buildFingerprint = findings => {
+              const payload = findings
+                .map(item => `${item.workflowPath}|${item.kind}|${item.detail}`)
+                .sort()
+                .join('\n');
+              return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 16);
+            };
+
+            const getLatestFingerprint = async issueNumber => {
+              const comments = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              for (let i = comments.data.length - 1; i >= 0; i -= 1) {
+                const body = comments.data[i].body || '';
+                const match = body.match(/<!-- automation-coverage:fingerprint=([a-f0-9]{16}) -->/);
+                if (match) return match[1];
+              }
+              return null;
+            };
+
+            const buildIssueBody = (targetRepo, findings, fingerprint) => {
+              const marker = `<!-- automation-coverage:repo=${targetRepo} -->`;
+              const fingerprintMarker = `<!-- automation-coverage:fingerprint=${fingerprint} -->`;
+              const lines = [
+                marker,
+                fingerprintMarker,
+                '## Downstream Automation Coverage Audit',
+                '',
+                'Repo: `' + targetRepo + '`',
+                '',
+                '### Findings',
+              ];
+
+              for (const finding of findings) {
+                const evidence = finding.url ? ` ([evidence](${finding.url}))` : '';
+                lines.push(`- ${finding.workflowPath}: ${finding.kind} — ${finding.detail}${evidence}`);
+              }
+
+              lines.push('', '### Expected Workflow Paths');
+              for (const workflowPath of workflowPaths) {
+                lines.push(`- ${workflowPath}`);
+              }
+
+              lines.push('', '---', '*Auto-generated by Downstream Automation Audit*');
+              return lines.join('\n');
+            };
+
+            const date = new Date().toISOString().split('T')[0];
+
+            for (const targetRepo of targetRepos) {
+              const [targetOwner, targetName] = targetRepo.split('/');
+              const findings = [];
+              let downstreamWorkflows = [];
+
+              try {
+                const workflowResponse = await github.rest.actions.listRepoWorkflows({
+                  owner: targetOwner,
+                  repo: targetName,
+                  per_page: 100,
+                });
+                downstreamWorkflows = workflowResponse.data.workflows;
+              } catch (error) {
+                findings.push({
+                  workflowPath: '[repo]',
+                  kind: 'api-error',
+                  detail: `Failed to list workflows: ${error.message}`,
+                });
+              }
+
+              const downstreamWorkflowMap = new Map(downstreamWorkflows.map(workflow => [workflow.path, workflow]));
+
+              for (const workflowPath of workflowPaths) {
+                const upstreamMeta = upstreamWorkflowMeta.get(workflowPath);
+                let downstreamBlobSha = null;
+
+                try {
+                  const downstreamBlob = await github.rest.repos.getContent({
+                    owner: targetOwner,
+                    repo: targetName,
+                    path: workflowPath,
+                  });
+                  downstreamBlobSha = downstreamBlob.data.sha;
+                } catch (error) {
+                  findings.push({
+                    workflowPath,
+                    kind: 'missing',
+                    detail: 'Caller workflow file is missing from downstream default branch.',
+                  });
+                  continue;
+                }
+
+                if (downstreamBlobSha !== upstreamMeta.sha) {
+                  findings.push({
+                    workflowPath,
+                    kind: 'drifted',
+                    detail: 'Downstream caller blob SHA does not match upstream SSoT.',
+                  });
+                }
+
+                const registeredWorkflow = downstreamWorkflowMap.get(workflowPath);
+                if (!registeredWorkflow) {
+                  findings.push({
+                    workflowPath,
+                    kind: 'unregistered',
+                    detail: 'Workflow file exists but is not registered by GitHub Actions.',
+                  });
+                  continue;
+                }
+
+                if (registeredWorkflow.state !== 'active') {
+                  findings.push({
+                    workflowPath,
+                    kind: 'disabled',
+                    detail: `Workflow state is ${registeredWorkflow.state}.`,
+                  });
+                  continue;
+                }
+
+                if (upstreamMeta.triggerClass !== 'schedule') {
+                  continue;
+                }
+
+                try {
+                  const runsResponse = await github.rest.actions.listWorkflowRuns({
+                    owner: targetOwner,
+                    repo: targetName,
+                    workflow_id: registeredWorkflow.id,
+                    per_page: 1,
+                  });
+                  const run = runsResponse.data.workflow_runs[0];
+                  if (!run) {
+                    findings.push({
+                      workflowPath,
+                      kind: 'stale',
+                      detail: `No recorded runs for scheduled workflow within ${staleDays}d policy window.`,
+                    });
+                    continue;
+                  }
+
+                  const ageMs = Date.now() - new Date(run.created_at).getTime();
+                  if (ageMs > staleMs) {
+                    findings.push({
+                      workflowPath,
+                      kind: 'stale',
+                      detail: `Latest scheduled run is older than ${staleDays}d (${Math.floor(ageMs / 86400000)}d).`,
+                      url: run.html_url,
+                    });
+                  }
+
+                  if (run.status !== 'completed' || unhealthyConclusions.has(run.conclusion)) {
+                    findings.push({
+                      workflowPath,
+                      kind: 'unhealthy-run',
+                      detail: `Latest scheduled run is ${run.status}/${run.conclusion}.`,
+                      url: run.html_url,
+                    });
+                  }
+                } catch (error) {
+                  findings.push({
+                    workflowPath,
+                    kind: 'run-query-error',
+                    detail: `Failed to inspect latest run: ${error.message}`,
+                  });
+                }
+              }
+
+              const issueTitle = `[Automation Coverage] ${targetRepo} degraded (${date})`;
+              const existingIssue = getExistingIssue(targetRepo);
+
+              if (findings.length === 0) {
+                if (!existingIssue) {
+                  continue;
+                }
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: existingIssue.number,
+                  body: [
+                    '## Downstream Automation Coverage Recovered',
+                    '',
+                    'All audited workflow callers in `' + targetRepo + '` match upstream and are active as of ' + date + '.',
+                  ].join('\n'),
+                });
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existingIssue.number,
+                  state: 'closed',
+                });
+                continue;
+              }
+
+              const fingerprint = buildFingerprint(findings);
+              const body = buildIssueBody(targetRepo, findings, fingerprint);
+
+              if (!existingIssue) {
+                await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title: issueTitle,
+                  body,
+                  labels: issueLabels,
+                });
+                continue;
+              }
+
+              const latestFingerprint = await getLatestFingerprint(existingIssue.number);
+              if (latestFingerprint === fingerprint) {
+                continue;
+              }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existingIssue.number,
+                body,
+              });
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existingIssue.number,
+                title: issueTitle,
+              });
+            }

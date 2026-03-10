@@ -52,6 +52,8 @@ group:
         dest: .github/workflows/auto-approve-runs.yml
       - source: .github/workflows/auto-merge.yml
         dest: .github/workflows/auto-merge.yml
+      - source: .github/workflows/automation-health.yml
+        dest: .github/workflows/automation-health.yml
       - source: .github/workflows/branch-cleanup.yml
         dest: .github/workflows/branch-cleanup.yml
       - source: .github/workflows/ci-notify-failure.yml

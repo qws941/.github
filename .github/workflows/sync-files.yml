@@ -19,6 +19,7 @@ on:
       # Workflow callers (alphabetical)
       - '.github/workflows/auto-approve-runs.yml'
       - '.github/workflows/auto-merge.yml'
+      - '.github/workflows/automation-health.yml'
       - '.github/workflows/branch-cleanup.yml'
       - '.github/workflows/ci-notify-failure.yml'
       - '.github/workflows/codex-auto-issue.yml'

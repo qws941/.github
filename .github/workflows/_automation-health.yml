@@ -1,0 +1,227 @@
+name: Automation Health (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      workflow-names:
+        description: 'Comma-separated workflow names to monitor'
+        required: false
+        type: string
+        default: ''
+      title-prefix:
+        description: 'Issue title prefix for health alerts'
+        required: false
+        type: string
+        default: '[Automation Health] degraded'
+      issue-labels:
+        description: 'Comma-separated labels for health issues'
+        required: false
+        type: string
+        default: 'type:ci,priority:medium'
+      unhealthy-conclusions:
+        description: 'Comma-separated run conclusions treated as unhealthy'
+        required: false
+        type: string
+        default: 'failure,timed_out,action_required,cancelled'
+      treat-missing-as-unhealthy:
+        description: 'Treat missing configured workflows as unhealthy'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  check:
+    name: Check workflow automation health
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      issues: write
+    steps:
+      - name: Evaluate workflow health
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          INPUT_WORKFLOW_NAMES: ${{ inputs.workflow-names }}
+          INPUT_TITLE_PREFIX: ${{ inputs.title-prefix }}
+          INPUT_ISSUE_LABELS: ${{ inputs.issue-labels }}
+          INPUT_UNHEALTHY_CONCLUSIONS: ${{ inputs.unhealthy-conclusions }}
+          INPUT_TREAT_MISSING_AS_UNHEALTHY: ${{ inputs.treat-missing-as-unhealthy }}
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const titlePrefix = process.env.INPUT_TITLE_PREFIX || '[Automation Health] degraded';
+            const parseCsv = value => (value || '')
+              .split(',')
+              .map(item => item.trim())
+              .filter(Boolean);
+
+            const workflowNames = parseCsv(process.env.INPUT_WORKFLOW_NAMES);
+            if (workflowNames.length === 0) {
+              core.notice('No workflow names configured. Skipping automation health check.');
+              return;
+            }
+
+            const issueLabels = parseCsv(process.env.INPUT_ISSUE_LABELS);
+            const unhealthyConclusions = new Set(parseCsv(process.env.INPUT_UNHEALTHY_CONCLUSIONS));
+            const treatMissingAsUnhealthy = String(process.env.INPUT_TREAT_MISSING_AS_UNHEALTHY) === 'true';
+
+            const isUnhealthy = run => {
+              if (!run) return false;
+              if (run.status !== 'completed') return true;
+              return unhealthyConclusions.has(run.conclusion);
+            };
+
+            const { data: repoWorkflows } = await github.rest.actions.listRepoWorkflows({
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            const callerWorkflows = repoWorkflows.workflows.filter(w => {
+              const path = w.path || '';
+              return !path.startsWith('.github/workflows/_');
+            });
+            const nameToId = new Map(callerWorkflows.map(w => [w.name, w.id]));
+            const checked = [];
+            const missing = [];
+            const unhealthy = [];
+
+            for (const workflowName of workflowNames) {
+              const workflowId = nameToId.get(workflowName);
+              if (!workflowId) {
+                missing.push(workflowName);
+                continue;
+              }
+
+              const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                per_page: 1,
+              });
+
+              const run = runs.workflow_runs[0];
+              if (!run) {
+                checked.push(`${workflowName}:no_runs`);
+                continue;
+              }
+
+              const state = `${run.status}/${run.conclusion}`;
+              checked.push(`${workflowName}:${state}`);
+              if (isUnhealthy(run)) {
+                unhealthy.push({
+                  workflowName,
+                  state,
+                  url: run.html_url,
+                  id: run.id,
+                });
+              }
+            }
+
+            const date = new Date().toISOString().split('T')[0];
+            const healthTitle = `${titlePrefix} (${date})`;
+            const shouldAlert = unhealthy.length > 0 || (treatMissingAsUnhealthy && missing.length > 0);
+
+            const fingerprintPayload = JSON.stringify({
+              unhealthy: unhealthy.map(item => `${item.workflowName}:${item.state}`).sort(),
+              missing: (treatMissingAsUnhealthy ? [...missing].sort() : []),
+            });
+            const fingerprint = require('crypto').createHash('sha256').update(fingerprintPayload).digest('hex').slice(0, 16);
+            const marker = `<!-- automation-health:fingerprint=${fingerprint} -->`;
+
+            const buildAlertBody = () => [
+              marker,
+              '## Automation Health Alert',
+              '',
+              `Detected unhealthy workflow runs on ${date}.`,
+              '',
+              '### Unhealthy Runs',
+              ...(unhealthy.length > 0 ? unhealthy.map(item => `- ${item.workflowName}: ${item.state} ([run ${item.id}](${item.url}))`) : ['- none']),
+              '',
+              '### Checked Workflows',
+              ...checked.map(line => `- ${line}`),
+              '',
+              '### Missing Workflows',
+              ...(missing.length > 0 ? missing.map(name => `- ${name}`) : ['- none']),
+              '',
+              '---',
+              '*Auto-generated by Automation Health workflow*',
+            ].join('\n');
+
+            const getLatestFingerprint = async issueNumber => {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              for (let i = comments.length - 1; i >= 0; i -= 1) {
+                const body = comments[i].body || '';
+                const match = body.match(/<!-- automation-health:fingerprint=([a-f0-9]{16}) -->/);
+                if (match) return match[1];
+              }
+              return null;
+            };
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = openIssues.find(issue => issue.title.startsWith(titlePrefix));
+
+            if (shouldAlert) {
+              if (existing) {
+                const latestFingerprint = await getLatestFingerprint(existing.number);
+                if (latestFingerprint === fingerprint) {
+                  core.notice(`No state change for health issue #${existing.number}; skipped duplicate comment`);
+                  return;
+                }
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  body: buildAlertBody(),
+                });
+                core.notice(`Updated existing health issue #${existing.number}`);
+              } else {
+                await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title: healthTitle,
+                  body: buildAlertBody(),
+                  labels: issueLabels,
+                });
+                core.notice('Created new health issue');
+              }
+              return;
+            }
+
+            if (!existing) {
+              core.notice('No unhealthy runs detected and no open health issue');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: existing.number,
+              body: [
+                '## Automation Health Recovered',
+                '',
+                `All monitored workflows are healthy as of ${date}. Closing this issue automatically.`,
+                '',
+                '### Checked Workflows',
+                ...checked.map(line => `- ${line}`),
+              ].join('\n'),
+            });
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: existing.number,
+              state: 'closed',
+            });
+            core.notice(`Closed recovered health issue #${existing.number}`);
