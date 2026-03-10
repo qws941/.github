@@ -1,4 +1,4 @@
-name: Codex PR Normalize
+name: Codex PR Normalize (Reusable)
 
 on:
   workflow_call:

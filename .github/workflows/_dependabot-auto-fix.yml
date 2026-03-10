@@ -10,7 +10,7 @@
 #     dependabot-fix:
 #       uses: qws941/.github/.github/workflows/_dependabot-auto-fix.yml@master
 
-name: Dependabot Auto-Fix
+name: Dependabot Auto-Fix (Reusable)
 
 on:
   workflow_call:

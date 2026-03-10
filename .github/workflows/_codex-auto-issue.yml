@@ -9,7 +9,7 @@
 #     codex:
 #       uses: qws941/.github/.github/workflows/_codex-auto-issue.yml@master
 
-name: Codex Auto-Issue
+name: Codex Auto-Issue (Reusable)
 
 on:
   workflow_call:

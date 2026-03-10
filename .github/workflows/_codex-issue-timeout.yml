@@ -1,4 +1,4 @@
-name: Codex Issue Timeout
+name: Codex Issue Timeout (Reusable)
 
 on:
   workflow_call:
