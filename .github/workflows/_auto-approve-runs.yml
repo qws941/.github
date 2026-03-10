@@ -1,8 +1,6 @@
 # Reusable Auto-Approve Runs Workflow
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
-# Event-driven: triggered by sync PR events, not cron polling.
-# Reruns action_required workflow runs and stale failures.
 #
 # Required secrets:
 #   - GH_PAT: GitHub PAT with actions:write permission
@@ -30,6 +28,8 @@ jobs:
             const repo = context.repo.repo;
             let rerunPending = 0;
             let rerunFailed = 0;
+            const triggeringRun = context.payload.workflow_run;
+            const triggeringAction = context.payload.action;
 
             const trustedActors = new Set([
               'github-actions[bot]',
@@ -40,6 +40,63 @@ jobs:
               'Codex',
               context.repo.owner,
             ]);
+
+            const isTrustedRun = run => trustedActors.has(run.actor?.login);
+
+            if (triggeringRun) {
+              try {
+                const { data: currentRun } = await github.rest.actions.getWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: triggeringRun.id,
+                });
+
+                if (!isTrustedRun(currentRun)) {
+                  core.info(`Skipping untrusted triggering run #${currentRun.id} (${currentRun.name})`);
+                  return;
+                }
+
+                if (
+                  triggeringAction === 'requested' ||
+                  currentRun.conclusion === 'action_required'
+                ) {
+                  try {
+                    await github.rest.actions.approveWorkflowRun({
+                      owner,
+                      repo,
+                      run_id: currentRun.id,
+                    });
+                    rerunPending++;
+                    core.info(`Approved triggering action_required run #${currentRun.id} (${currentRun.name})`);
+                  } catch (e) {
+                    core.warning(`Failed to approve triggering run #${currentRun.id}: ${e.message}`);
+                  }
+                }
+
+                if (
+                  triggeringAction === 'completed' &&
+                  currentRun.conclusion === 'failure' &&
+                  currentRun.run_attempt === 1
+                ) {
+                  try {
+                    await github.rest.actions.reRunWorkflowFailedJobs({
+                      owner,
+                      repo,
+                      run_id: currentRun.id,
+                    });
+                    rerunFailed++;
+                    core.info(`Reran failed jobs for triggering run #${currentRun.id} (${currentRun.name})`);
+                  } catch (e) {
+                    core.warning(`Failed to rerun triggering run #${currentRun.id}: ${e.message}`);
+                  }
+                }
+              } catch (e) {
+                core.warning(`Failed to inspect triggering workflow run #${triggeringRun.id}: ${e.message}`);
+              }
+
+              core.info(`Done: ${rerunPending} action_required approved, ${rerunFailed} failure rerun`);
+              return;
+            }
 
             // Rerun action_required runs (approve API only works for fork PRs)
             try {
