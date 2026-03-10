@@ -6,7 +6,7 @@
 #     stale:
 #       uses: qws941/.github/.github/workflows/_stale.yml@master
 
-name: Stale
+name: Stale (Reusable)
 
 on:
   workflow_call:
@@ -31,6 +31,8 @@ jobs:
             push changes to keep it open.
           days-before-stale: 14
           days-before-close: 5
-          exempt-issue-labels: 'keep-open,pinned,security'
-          exempt-pr-labels: 'keep-open,pinned,security'
+          stale-issue-label: 'status:stale'
+          stale-pr-label: 'status:stale'
+          exempt-issue-labels: 'keep-open,pinned,type:security'
+          exempt-pr-labels: 'keep-open,pinned,type:security'
           remove-stale-when-updated: true

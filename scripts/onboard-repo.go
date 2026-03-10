@@ -8,7 +8,7 @@
 // Steps:
 //
 //  1. Add repo to .github/sync.yml (alphabetically) → triggers file sync on push
-//  2. Sync 26 standard labels from scripts/labels.yml
+//  2. Sync 27 standard labels from scripts/labels.yml
 //  3. Create 5 webhooks (4 MCPhub + 1 n8n)
 //  4. Generate .github/dependabot.yml based on detected language ecosystems
 //  5. Verify onboarding status

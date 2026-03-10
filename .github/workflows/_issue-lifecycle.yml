@@ -1,4 +1,4 @@
-name: Issue Lifecycle Template
+name: Issue Lifecycle (Reusable)
 
 on:
   workflow_call:
@@ -101,7 +101,7 @@ jobs:
 
             core.info(`Found linked issues: ${linkedIssues.join(', ')}`);
 
-            // Label linked issues with 'in-progress' when PR is opened
+            // Label linked issues with 'status:in-progress' when PR is opened
             if (context.payload.action === 'opened') {
               for (const issueNumber of linkedIssues) {
                 try {
@@ -109,9 +109,9 @@ jobs:
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issueNumber,
-                    labels: ['in-progress']
+                    labels: ['status:in-progress']
                   });
-                  core.info(`Labeled issue #${issueNumber} as in-progress`);
+                  core.info(`Labeled issue #${issueNumber} as status:in-progress`);
                 } catch (error) {
                   core.warning(`Failed to label issue #${issueNumber}: ${error.message}`);
                 }
@@ -183,12 +183,12 @@ jobs:
                   body: mergeComment
                 });
 
-                // Remove in-progress label
+                // Remove status labels that no longer apply
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber,
-                  name: 'in-progress'
+                  name: 'status:in-progress'
                 }).catch(() => {});
 
                 core.info(`Commented on issue #${issueNumber}`);
@@ -208,7 +208,7 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const labelsToRemove = ['in-progress', 'stale'];
+            const labelsToRemove = ['status:in-progress', 'status:stale'];
 
             for (const label of labelsToRemove) {
               const hasLabel = issue.labels.some(l => l.name === label);

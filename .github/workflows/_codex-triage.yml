@@ -3,7 +3,7 @@
 #
 # Enhanced triage with:
 #   - Title keyword matching (failure, deploy, build, ELK, health, drift)
-#   - Label-based matching (elk-alert, health, infrastructure, ci-failure, drift)
+#   - Label-based matching using standard labels (type:ci, type:infra, type:security)
 #   - Dedup check (skips if @codex comment already exists)
 #   - Context-aware investigation prompts (ELK, infra, drift, generic)
 #   - Auto-assigns Codex bot to the issue
@@ -13,7 +13,7 @@
 #     triage:
 #       uses: qws941/.github/.github/workflows/_codex-triage.yml@master
 
-name: Codex Triage
+name: Codex Triage (Reusable)
 
 on:
   workflow_call:
@@ -46,12 +46,9 @@ jobs:
       )) ||
       (github.event.action == 'labeled' &&
         github.event.label.name != 'codex' && (
-        github.event.label.name == 'elk-alert' ||
-        github.event.label.name == 'health' ||
-        github.event.label.name == 'infrastructure' ||
-        github.event.label.name == 'ci-failure' ||
-        github.event.label.name == 'drift' ||
-        github.event.label.name == 'security'
+        github.event.label.name == 'type:ci' ||
+        github.event.label.name == 'type:infra' ||
+        github.event.label.name == 'type:security'
       ))
     steps:
       - name: Check for existing Codex comment
@@ -81,7 +78,7 @@ jobs:
 
             let prompt;
 
-            if (title.includes('[ELK Alert]') || labels.includes('elk-alert')) {
+            if (title.includes('[ELK Alert]')) {
               prompt = [
                 '@codex Investigate this ELK alert.',
                 '',
@@ -99,8 +96,7 @@ jobs:
             } else if (
               title.includes('[Health') ||
               title.includes('[Runner') ||
-              labels.includes('health') ||
-              labels.includes('infrastructure')
+              labels.includes('type:infra')
             ) {
               prompt = [
                 '@codex Investigate this infrastructure issue.',
@@ -112,7 +108,7 @@ jobs:
                 '4. If a service is down, check Docker container logs and restart status',
                 '5. Summarize the current state and recommended recovery steps',
               ];
-            } else if (title.includes('[Drift') || labels.includes('drift')) {
+            } else if (title.includes('[Drift')) {
               prompt = [
                 '@codex Investigate this Terraform drift.',
                 '',

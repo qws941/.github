@@ -1,5 +1,5 @@
 # Standard labels for all repositories
-# Used by sync-labels.sh to ensure consistency
+# Used by sync-labels.go to ensure consistency
 
 # Type labels
 - name: "type:bug"
@@ -67,6 +67,10 @@
 - name: "status:needs-review"
   color: "006b75"
   description: "Ready for review"
+
+- name: "status:stale"
+  color: "8a6d3b"
+  description: "Marked stale due to inactivity"
 
 - name: "status:wontfix"
   color: "ffffff"
