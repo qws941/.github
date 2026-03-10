@@ -71,7 +71,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 │   ├── release-drafter.yml         # Release drafter category config
 │   └── sync.yml                    # Sync target config: 1 group, 14 repos
 ├── scripts/
-│   ├── labels.yml                  # 26 standard labels (type:*/priority:*/status:*/size:*)
+│   ├── labels.yml                  # 27 standard labels (type:*/priority:*/status:*/size:*)
 │   ├── onboard-repo.go             # Automated repo onboarding (sync, labels, webhooks, dependabot)
 │   └── sync-labels.go              # Go label sync (parallel, delete-stale, summary table)
 ├── profile/
@@ -94,7 +94,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 | Synced workflows              | `.github/workflows/{name}.yml`     | No `_` prefix = synced to downstream repos                 |
 | Issue templates               | `.github/ISSUE_TEMPLATE/`          | Bug report, feature request, and general issue forms       |
 | PR template                   | `.github/PULL_REQUEST_TEMPLATE.md` | What/Why/Kind/Changes/Testing/Checklist format             |
-| Standard labels               | `scripts/labels.yml`               | 26 labels: `type:*`, `priority:*`, `status:*`, `size/*`    |
+| Standard labels               | `scripts/labels.yml`               | 27 labels: `type:*`, `priority:*`, `status:*`, `size/*`    |
 | Label sync to repos           | `scripts/sync-labels.go`           | Go CLI, parallel sync with `--delete-stale`, `--dry-run`   |
 | Contribution rules            | `CONTRIBUTING.md`                  | Trunk-based dev, conventional commits, review SLA          |
 | Security reports              | `SECURITY.md`                      | Email security@jclee.me, 48h response SLA                  |
@@ -240,6 +240,7 @@ jobs:
 | `codex-triage.yml` | `issues: opened` | Filters title for failure/deploy/build/docker keywords → posts `@codex` investigate comment |
 | `codex-auto-issue.yml` | `issues: labeled` with `codex` label | Posts `@codex` comment with issue title and body context |
 | `dependabot-auto-fix.yml` | `schedule` (Monday 03:00 UTC) + `workflow_dispatch` | Fetches open Dependabot alerts, deduplicates, creates codex-labeled issues → triggers codex-auto-issue pipeline |
+| `automation-health.yml` | `workflow_run: completed` + `workflow_dispatch` | Monitors shared workflow health and opens repo-local health issues |
 | `codex-pr-normalize.yml` | `pull_request_target: opened, edited` | Normalizes Codex PR title to conventional commit, adds labels, undrafts |
 | `codex-pr-review.yml` | `pull_request_target: opened, synchronize` | Auto-reviews PRs via @codex |
 | `codex-issue-timeout.yml` | `schedule` + `workflow_dispatch` | Closes stale Codex-assigned issues after timeout |
@@ -270,6 +271,8 @@ GitHub offers native third-party coding agents (OpenAI Codex, Anthropic Claude) 
 
 The `codex-triage.yml` and `codex-auto-issue.yml` workflows post `@codex` comments on issues. The connector app responds when a Codex Environment is configured for the repo. Rapid-fire mentions across multiple issues may hit rate limits — the bot silently drops responses in that case.
 
+`downstream-automation-audit.yml` runs only in `qws941/.github` and scans all sync target repos for missing, disabled, or unhealthy shared automation workflows, then registers findings as upstream issues.
+
 ### GitHub Actions
 
 - SHA-pin all actions with `# vN` version comment suffix
@@ -287,11 +290,11 @@ The `codex-triage.yml` and `codex-auto-issue.yml` workflows post `@codex` commen
 
 ### Labels
 
-26 standard labels across all repos, defined in `scripts/labels.yml`:
+27 standard labels across all repos, defined in `scripts/labels.yml`:
 
 - `type:bug`, `type:feature`, `type:docs`, `type:refactor`, `type:ci`, `type:chore`, `type:security`, `type:test`, `type:infra`
 - `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
-- `status:blocked`, `status:in-progress`, `status:needs-review`, `status:wontfix`, `status:duplicate`
+- `status:blocked`, `status:in-progress`, `status:needs-review`, `status:stale`, `status:wontfix`, `status:duplicate`
 - `size/xs`, `size/s`, `size/m`, `size/l`, `size/xl`
 - `sync`, `auto-merge`, `codex`
 

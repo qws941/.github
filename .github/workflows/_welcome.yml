@@ -6,7 +6,7 @@
 #     welcome:
 #       uses: qws941/.github/.github/workflows/_welcome.yml@master
 
-name: Welcome
+name: Welcome (Reusable)
 
 on:
   workflow_call:

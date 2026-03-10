@@ -6,7 +6,7 @@
 #     draft:
 #       uses: qws941/.github/.github/workflows/_release-drafter.yml@master
 
-name: Release Drafter
+name: Release Drafter (Reusable)
 
 on:
   workflow_call:
