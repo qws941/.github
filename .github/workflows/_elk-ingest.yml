@@ -21,7 +21,7 @@
 # Optional secrets:
 #   ELASTICSEARCH_API_KEY — API key for xpack-secured clusters
 
-name: ELK Ingest
+name: ELK Ingest (Reusable)
 
 on:
   workflow_call:

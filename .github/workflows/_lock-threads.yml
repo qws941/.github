@@ -6,7 +6,7 @@
 #     lock:
 #       uses: qws941/.github/.github/workflows/_lock-threads.yml@master
 
-name: Lock Threads
+name: Lock Threads (Reusable)
 
 on:
   workflow_call:

@@ -6,7 +6,7 @@
 #     labeler:
 #       uses: qws941/.github/.github/workflows/_labeler.yml@master
 
-name: PR Labeler
+name: PR Labeler (Reusable)
 
 on:
   workflow_call:

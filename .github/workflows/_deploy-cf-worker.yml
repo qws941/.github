@@ -10,7 +10,7 @@
 #         environment: production
 #       secrets: inherit
 
-name: Deploy Cloudflare Worker
+name: Deploy Cloudflare Worker (Reusable)
 
 on:
   workflow_call:

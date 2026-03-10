@@ -9,7 +9,7 @@
 #     label:
 #       uses: qws941/.github/.github/workflows/_issue-label.yml@master
 
-name: Issue Auto-Label
+name: Issue Auto-Label (Reusable)
 
 on:
   workflow_call:
