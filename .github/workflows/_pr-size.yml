@@ -16,6 +16,11 @@ jobs:
     name: Label PR size
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
       - name: Label size
         uses: CodelyTV/pr-size-labeler@4ec67706cd878fbc1c8db0a5dcd28b6bb412e85a # v1
         with:

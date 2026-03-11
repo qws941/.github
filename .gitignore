@@ -12,3 +12,19 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Go compiled binaries
+onboard-repo
+preview-sync
+sync-labels
+
+# Go workspace (local dev only)
+go.work
+go.work.sum
+
+# Agent working directories
+.sisyphus/
+
+# Backup files
+*.backup
+*.backup-*

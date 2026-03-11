@@ -19,6 +19,11 @@ jobs:
       group: lock-threads
       cancel-in-progress: false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
       - name: Lock threads
         uses: dessant/lock-threads@7266a7ce5c1df01b1c6db85bf8cd86c737dadbe7 # v6.0.0
         with:

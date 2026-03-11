@@ -63,6 +63,11 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
       - name: Index event to Elasticsearch
         continue-on-error: true
         env:

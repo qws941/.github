@@ -1,13 +1,12 @@
-# Reusable CI Failure Notification Workflow
+# Reusable CI Workflow Notification Workflow
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
-# Creates a GitHub Issue when a CI workflow fails. Deduplicates by title prefix:
-# if an open issue with the same prefix exists, adds a comment instead.
+# Creates a GitHub Issue when a CI workflow ends in an unhealthy state. Deduplicates by title prefix.
 #
 # Usage:
 #   jobs:
 #     notify:
-#       if: failure()
+#       if: contains(fromJSON('["failure","timed_out","action_required","cancelled"]'), github.event.workflow_run.conclusion)
 #       uses: qws941/.github/.github/workflows/_ci-notify-failure.yml@master
 #       with:
 #         title-prefix: '[CI] Build failed'
@@ -35,12 +34,17 @@ on:
 
 jobs:
   notify:
-    name: Create failure issue
+    name: Create workflow issue
     runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
-      - name: Create or update failure issue
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
+      - name: Create or update workflow issue
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           INPUT_TITLE_PREFIX: ${{ inputs.title-prefix }}
@@ -71,29 +75,44 @@ jobs:
               }
             }`;
 
+            const workflowRun = context.payload.workflow_run || null;
+            const workflowRunId = workflowRun?.id || context.runId;
+            const rawConclusion = workflowRun?.conclusion || 'failure';
+            const conclusionMap = {
+              failure: 'Failed',
+              timed_out: 'Timed Out',
+              action_required: 'Action Required',
+              cancelled: 'Cancelled',
+            };
+            const conclusionLabel = conclusionMap[rawConclusion] || rawConclusion
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+
             // Build title — use input prefix or derive from workflow_run context
             let titlePrefix;
             if (inputPrefix) {
               titlePrefix = inputPrefix;
-            } else if (context.payload.workflow_run) {
-              titlePrefix = '[' + context.payload.workflow_run.name + '] Failed';
+            } else if (workflowRun) {
+              titlePrefix = '[' + workflowRun.name + '] ' + conclusionLabel;
             } else {
-              titlePrefix = '[' + context.workflow + '] Failed';
+              titlePrefix = '[' + context.workflow + '] ' + conclusionLabel;
             }
             const issueTitle = titlePrefix + ' (' + today + ')';
 
             // Build body
-            const workflowName = context.payload.workflow_run
-              ? context.payload.workflow_run.name
+            const workflowName = workflowRun
+              ? workflowRun.name
               : context.workflow;
-            const workflowUrl = context.payload.workflow_run
-              ? context.payload.workflow_run.html_url
+            const workflowUrl = workflowRun
+              ? workflowRun.html_url
               : runUrl;
 
             let body = [
-              '## Workflow Failure',
+              '## Workflow Run Alert',
               '',
               '**Date:** ' + today,
+              '**Conclusion:** ' + conclusionLabel,
               '**Commit:** [`' + commit + '`](' + commitUrl + ')',
               '**Triggered by:** ' + context.actor,
               '**Workflow:** ' + workflowName,
@@ -107,7 +126,7 @@ jobs:
             body += '\n\n' + [
               '### Action Required',
               '- [ ] Check the [workflow run](' + workflowUrl + ') for error details',
-              '- [ ] Fix the root cause and re-run',
+              '- [ ] Fix the root cause or re-run if the conclusion is transient',
               '- [ ] Close this issue when resolved',
               '',
               '---',
@@ -128,14 +147,33 @@ jobs:
             );
 
             if (duplicate) {
+              const commentMarker = `<!-- ci-notify-failure:run-id=${workflowRunId} -->`;
+              const { data: existingComments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: duplicate.number,
+                per_page: 100,
+              });
+
+              const alreadyLogged = existingComments.some(comment =>
+                (comment.body || '').includes(commentMarker)
+              );
+
+              if (alreadyLogged) {
+                core.info('Recurring alert already logged for run #' + workflowRunId + ' on issue #' + duplicate.number);
+                return;
+              }
+
               const commentBody = [
-                '## Recurring Failure (' + today + ')',
+                commentMarker,
+                '## Recurring Workflow Alert (' + today + ')',
                 '',
+                '**Conclusion:** ' + conclusionLabel,
                 '**Commit:** [`' + commit + '`](' + commitUrl + ')',
                 '**Triggered by:** ' + context.actor,
                 '**Run:** [View logs](' + workflowUrl + ')',
                 '',
-                'This workflow failed again. See the run logs for details.',
+                'This workflow reported the same unhealthy conclusion again. See the run logs for details.',
               ].join('\n');
 
               await github.rest.issues.createComment({

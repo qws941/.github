@@ -14,6 +14,7 @@
 //	--repo      Sync a single repo (default: all qws941 repos)
 //	--delete    Remove labels not defined in labels.yml
 //	--workers   Parallel workers (default: 4)
+//	--verbose   Enable verbose logging
 package main
 
 import (
@@ -55,6 +56,7 @@ func main() {
 	singleRepo := flag.String("repo", "", "Sync single repo (owner/repo)")
 	deleteStale := flag.Bool("delete", false, "Remove labels not in labels.yml")
 	workers := flag.Int("workers", 4, "Parallel workers")
+	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
 
 	labelsPath, err := resolveFromRoot(labelsFile)
@@ -65,12 +67,14 @@ func main() {
 	if err != nil {
 		fatal("parse labels.yml: %v", err)
 	}
+	logVerbose(*verbose, "Loaded %d labels from %s", len(standard), labelsPath)
 	fmt.Printf("Loaded %d standard labels from %s\n", len(standard), labelsFile)
 
 	repos, err := targetRepos(*singleRepo)
 	if err != nil {
 		fatal("list repos: %v", err)
 	}
+	logVerbose(*verbose, "Found %d repositories", len(repos))
 	fmt.Printf("Targets: %d repo(s)\n\n", len(repos))
 
 	mode := "EXECUTE"
@@ -99,7 +103,8 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for repo := range ch {
-				res := syncRepo(repo, standard, *dryRun, *deleteStale)
+				logVerbose(*verbose, "Processing repo: %s", repo)
+				res := syncRepo(repo, standard, *dryRun, *deleteStale, *verbose)
 				mu.Lock()
 				results = append(results, res)
 				mu.Unlock()
@@ -128,8 +133,10 @@ func main() {
 }
 
 // syncRepo syncs labels for a single repo and returns the result.
-func syncRepo(repo string, standard []label, dryRun, deleteStale bool) repoResult {
+func syncRepo(repo string, standard []label, dryRun, deleteStale, verbose bool) repoResult {
 	res := repoResult{Repo: repo, Total: len(standard)}
+
+	logVerbose(verbose, "Syncing labels for %s", repo)
 
 	// Fetch existing labels.
 	out, err := ghOutput("label", "list", "--repo", repo, "--json", "name,color,description", "--limit", "200")
@@ -187,11 +194,14 @@ func syncRepo(repo string, standard []label, dryRun, deleteStale bool) repoResul
 			continue
 		}
 
+		action := "Created"
 		if exists {
+			action = "Updated"
 			res.Updated++
 		} else {
 			res.Created++
 		}
+		logVerbose(verbose, "%s label '%s' in %s", action, l.Name, repo)
 	}
 
 	// Delete stale labels (not in labels.yml).
@@ -208,6 +218,7 @@ func syncRepo(repo string, standard []label, dryRun, deleteStale bool) repoResul
 				res.Errors = append(res.Errors, fmt.Sprintf("delete %s: %v", l.Name, err))
 				continue
 			}
+			logVerbose(verbose, "Deleted label '%s' from %s", l.Name, repo)
 			res.Deleted++
 		}
 	}
@@ -328,6 +339,13 @@ func unquote(s string) string {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// logVerbose prints verbose log messages to stderr when verbose mode is enabled.
+func logVerbose(verbose bool, format string, v ...interface{}) {
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[VERBOSE] "+format+"\n", v...)
+	}
+}
 
 func ghOutput(args ...string) (string, error) {
 	cmd := exec.Command("gh", args...)

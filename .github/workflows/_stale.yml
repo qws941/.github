@@ -16,6 +16,11 @@ jobs:
     name: Mark stale issues and PRs
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
       - name: Stale
         uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v9
         with:

@@ -38,15 +38,39 @@ on:
       - '.github/workflows/stale.yml'
       - '.github/workflows/welcome.yml'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview changes without applying'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Set up Go
+        if: ${{ inputs.dry_run == true }}
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: '1.22'
+
+      - name: Preview sync
+        if: ${{ inputs.dry_run == true }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: go run scripts/preview-sync.go
+
       - name: Sync files
+        if: ${{ inputs.dry_run != true }}
         uses: BetaHuhn/repo-file-sync-action@8b92be3375cf1d1b0cd579af488a9255572e4619 # v1.21.1
         with:
           GH_PAT: ${{ secrets.GH_PAT }}
