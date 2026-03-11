@@ -43,6 +43,7 @@ jobs:
             ]);
             const prEvents = new Set(['pull_request', 'pull_request_target']);
             const workflowEventAllowlist = new Map([
+              ['Automation Health', new Set(['workflow_run', 'workflow_dispatch'])],
               ['Auto Merge', new Set(['pull_request_target'])],
               ['Auto Approve Runs', new Set(['pull_request_target', 'workflow_dispatch', 'schedule'])],
               ['Codex PR Normalize', new Set(['pull_request_target'])],
@@ -56,9 +57,13 @@ jobs:
 
             const isTrustedRun = run => trustedActors.has(run.actor?.login);
             const hasPrLink = run => !Array.isArray(run.pull_requests) || run.pull_requests.length > 0;
+            const isRepoLocalHealthRun = run =>
+              run.name === 'Automation Health' &&
+              run.event === 'workflow_run' &&
+              run.head_branch === context.ref.replace('refs/heads/', '');
             const isManagedPrRun = run => {
               const allowedEvents = workflowEventAllowlist.get(run.name) || prEvents;
-              return allowedEvents.has(run.event) && hasPrLink(run);
+              return allowedEvents.has(run.event) && (hasPrLink(run) || isRepoLocalHealthRun(run));
             };
             const allowedNames = new Set([
               'Auto Merge',
