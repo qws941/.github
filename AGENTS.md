@@ -385,4 +385,5 @@ go run scripts/onboard-repo.go --repo qws941/new-repo --dry-run
 - `chatgpt-codex-connector` GitHub App installed with all-repo access. `@codex review` works in any repo PR. Issue-context `@codex` mentions require a Codex Environment configured per-repo at `chatgpt.com/codex/settings/environments`. Rapid-fire mentions may hit rate limits.
 - AGENTS.md is NOT synced — each repo maintains its own project knowledge base. Codex reads the repo-local AGENTS.md automatically.
 - GH_PAT is used in `auto-merge.yml` for PR approval and auto-merge queueing (waits for CI to pass before merging).
+- `auto-merge.yml` reconciles PR state idempotently: draft/conflict/changes-requested blockers exit cleanly, while real GitHub API/auth failures still fail the workflow. `auto-approve-runs.yml` also performs a one-shot rerun of first-attempt cancelled `Auto Merge` runs.
 - `auto-approve-runs.yml` is triggered by `pull_request_target` events for the current PR plus recovery `workflow_dispatch`/`schedule`. It approves trusted blocked PR runs, excludes `Auto Approve Runs` from self-approval, and keeps stale failure reruns in the recovery sweep.
