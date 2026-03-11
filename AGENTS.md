@@ -270,7 +270,7 @@ GitHub offers native third-party coding agents (OpenAI Codex, Anthropic Claude) 
 
 The `codex-triage.yml` and `codex-auto-issue.yml` workflows post `@codex` comments on issues. The connector app responds when a Codex Environment is configured for the repo. Rapid-fire mentions across multiple issues may hit rate limits — the bot silently drops responses in that case.
 
-`downstream-automation-audit.yml` runs only in `qws941/.github` and scans all sync target repos for missing, disabled, or unhealthy shared automation workflows after sync and on schedule, then registers findings as upstream issues.
+`downstream-automation-audit.yml` runs only in `qws941/.github` and scans all sync target repos for missing, disabled, or unhealthy shared automation workflows after sync and on schedule, then registers findings in the affected downstream repos.
 
 ### GitHub Actions
 
