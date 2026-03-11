@@ -28,7 +28,7 @@ jobs:
       - name: Audit downstream automation coverage
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          AUDIT_ISSUE_LABELS: 'type:ci,priority:high'
+          AUDIT_ISSUE_LABELS: 'type:ci,priority:high,codex'
           AUDIT_SCHEDULE_STALE_DAYS: '10'
           AUDIT_UNHEALTHY_CONCLUSIONS: 'failure,timed_out,action_required,cancelled'
         with:
@@ -107,16 +107,16 @@ jobs:
               });
             }
 
-            const openIssues = await github.rest.issues.listForRepo({
+            const upstreamOpenIssues = await github.rest.issues.listForRepo({
               owner,
               repo,
               state: 'open',
               per_page: 100,
             });
 
-            const getExistingIssue = targetRepo => {
+            const getLegacyUpstreamIssue = targetRepo => {
               const marker = `automation-coverage:repo=${targetRepo}`;
-              return openIssues.data.find(issue => (issue.body || '').includes(marker));
+              return upstreamOpenIssues.data.find(issue => (issue.body || '').includes(marker));
             };
 
             const buildFingerprint = findings => {
@@ -127,10 +127,10 @@ jobs:
               return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 16);
             };
 
-            const getLatestFingerprint = async issueNumber => {
+            const getLatestFingerprint = async (issueOwner, issueRepo, issueNumber) => {
               const comments = await github.rest.issues.listComments({
-                owner,
-                repo,
+                owner: issueOwner,
+                repo: issueRepo,
                 issue_number: issueNumber,
                 per_page: 100,
               });
@@ -175,6 +175,7 @@ jobs:
               const [targetOwner, targetName] = targetRepo.split('/');
               const findings = [];
               let downstreamWorkflows = [];
+              const marker = `automation-coverage:repo=${targetRepo}`;
 
               try {
                 const workflowResponse = await github.rest.actions.listRepoWorkflows({
@@ -289,29 +290,57 @@ jobs:
               }
 
               const issueTitle = `[Automation Coverage] ${targetRepo} degraded (${date})`;
-              const existingIssue = getExistingIssue(targetRepo);
+              const { data: downstreamOpenIssues } = await github.rest.issues.listForRepo({
+                owner: targetOwner,
+                repo: targetName,
+                state: 'open',
+                per_page: 100,
+              });
+              const existingIssue = downstreamOpenIssues.find(issue => (issue.body || '').includes(marker));
+              const legacyUpstreamIssue = getLegacyUpstreamIssue(targetRepo);
 
               if (findings.length === 0) {
                 if (!existingIssue) {
-                  continue;
+                  if (!legacyUpstreamIssue) {
+                    continue;
+                  }
+                } else {
+                  await github.rest.issues.createComment({
+                    owner: targetOwner,
+                    repo: targetName,
+                    issue_number: existingIssue.number,
+                    body: [
+                      '## Downstream Automation Coverage Recovered',
+                      '',
+                      'All audited workflow callers in `' + targetRepo + '` match upstream and are active as of ' + date + '.',
+                    ].join('\n'),
+                  });
+                  await github.rest.issues.update({
+                    owner: targetOwner,
+                    repo: targetName,
+                    issue_number: existingIssue.number,
+                    state: 'closed',
+                  });
                 }
 
-                await github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: existingIssue.number,
-                  body: [
-                    '## Downstream Automation Coverage Recovered',
-                    '',
-                    'All audited workflow callers in `' + targetRepo + '` match upstream and are active as of ' + date + '.',
-                  ].join('\n'),
-                });
-                await github.rest.issues.update({
-                  owner,
-                  repo,
-                  issue_number: existingIssue.number,
-                  state: 'closed',
-                });
+                if (legacyUpstreamIssue) {
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: legacyUpstreamIssue.number,
+                    body: [
+                      '## Downstream Automation Coverage Moved',
+                      '',
+                      'Coverage tracking now lives in the downstream repository itself. Closing this upstream legacy issue automatically.',
+                    ].join('\n'),
+                  });
+                  await github.rest.issues.update({
+                    owner,
+                    repo,
+                    issue_number: legacyUpstreamIssue.number,
+                    state: 'closed',
+                  });
+                }
                 continue;
               }
 
@@ -319,31 +348,76 @@ jobs:
               const body = buildIssueBody(targetRepo, findings, fingerprint);
 
               if (!existingIssue) {
-                await github.rest.issues.create({
-                  owner,
-                  repo,
+                const created = await github.rest.issues.create({
+                  owner: targetOwner,
+                  repo: targetName,
                   title: issueTitle,
                   body,
+                });
+                await github.rest.issues.addLabels({
+                  owner: targetOwner,
+                  repo: targetName,
+                  issue_number: created.data.number,
                   labels: issueLabels,
                 });
+
+                if (legacyUpstreamIssue) {
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: legacyUpstreamIssue.number,
+                    body: [
+                      '## Downstream Automation Coverage Moved',
+                      '',
+                      'Coverage tracking now lives in the downstream repository itself. Closing this upstream legacy issue automatically.',
+                      '',
+                      `New issue: ${created.data.html_url}`,
+                    ].join('\n'),
+                  });
+                  await github.rest.issues.update({
+                    owner,
+                    repo,
+                    issue_number: legacyUpstreamIssue.number,
+                    state: 'closed',
+                  });
+                }
                 continue;
               }
 
-              const latestFingerprint = await getLatestFingerprint(existingIssue.number);
-              if (latestFingerprint === fingerprint) {
-                continue;
+              const latestFingerprint = await getLatestFingerprint(targetOwner, targetName, existingIssue.number);
+              if (latestFingerprint !== fingerprint) {
+                await github.rest.issues.createComment({
+                  owner: targetOwner,
+                  repo: targetName,
+                  issue_number: existingIssue.number,
+                  body,
+                });
+                await github.rest.issues.update({
+                  owner: targetOwner,
+                  repo: targetName,
+                  issue_number: existingIssue.number,
+                  title: issueTitle,
+                });
               }
 
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: existingIssue.number,
-                body,
-              });
-              await github.rest.issues.update({
-                owner,
-                repo,
-                issue_number: existingIssue.number,
-                title: issueTitle,
-              });
+              if (legacyUpstreamIssue) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: legacyUpstreamIssue.number,
+                  body: [
+                    '## Downstream Automation Coverage Moved',
+                    '',
+                    'Coverage tracking now lives in the downstream repository itself. Closing this upstream legacy issue automatically.',
+                    '',
+                    `Active downstream issue: https://github.com/${targetRepo}/issues/${existingIssue.number}`,
+                  ].join('\n'),
+                });
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: legacyUpstreamIssue.number,
+                  state: 'closed',
+                });
+              }
             }
