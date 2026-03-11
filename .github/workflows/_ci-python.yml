@@ -66,7 +66,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@63c24ba6bd7ba023e95a2965a89232d3dfe59342 # v2.7.0
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
