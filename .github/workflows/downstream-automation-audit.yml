@@ -6,8 +6,6 @@ on:
       - 'Sync Common Files'
     types: [completed]
   workflow_dispatch:
-  schedule:
-    - cron: '15 4 * * *'
 
 permissions:
   contents: read
