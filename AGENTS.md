@@ -66,7 +66,6 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 │   ├── CODEOWNERS                  # * @qws941, /.github/ @qws941
 │   ├── FUNDING.yml                 # github: qws941
 │   ├── PULL_REQUEST_TEMPLATE.md    # What/Why/Kind/Changes/Testing/Checklist
-│   ├── dependabot.yml              # Weekly github-actions updates
 │   ├── labeler.yml                 # PR auto-label path rules (8 labels)
 │   ├── release-drafter.yml         # Release drafter category config
 │   └── sync.yml                    # Sync target config: 1 group, 14 repos
@@ -102,7 +101,7 @@ GitHub community health files **Single Source of Truth (SSoT)** for all `qws941`
 | Editor formatting             | `.editorconfig`                    | Synced to all repos                                        |
 | Codex automation              | `.github/workflows/codex-*.yml`    | Triage, auto-issue, PR review, PR normalize, issue timeout |
 | Community automation        | `.github/workflows/{welcome,lock-threads}.yml` | First-time greeting + thread locking             |
-| Dependabot auto-fix         | `.github/workflows/dependabot-auto-fix.yml`             | Weekly Dependabot alert → Codex issue pipeline   |
+| Dependabot auto-fix         | `.github/workflows/dependabot-auto-fix.yml`             | Manual Dependabot alert → Codex issue pipeline   |
 | PR quality gates            | `.github/workflows/{commitlint,pr-size}.yml`    | Conventional commit enforcement + size labeling  |
 | Release management          | `.github/workflows/release-drafter.yml`         | Auto-draft release notes from merged PRs         |
 | Release drafter config      | `.github/release-drafter.yml`                   | PR category → changelog section mapping          |
@@ -239,7 +238,7 @@ jobs:
 | --- | --- | --- |
 | `codex-triage.yml` | `issues: opened` | Filters title for failure/deploy/build/docker keywords → posts `@codex` investigate comment |
 | `codex-auto-issue.yml` | `issues: labeled` with `codex` label | Posts `@codex` comment with issue title and body context |
-| `dependabot-auto-fix.yml` | `schedule` (Monday 03:00 UTC) + `workflow_dispatch` | Fetches open Dependabot alerts, deduplicates, creates codex-labeled issues → triggers codex-auto-issue pipeline |
+| `dependabot-auto-fix.yml` | `workflow_dispatch` | Fetches open Dependabot alerts, deduplicates, creates codex-labeled issues → triggers codex-auto-issue pipeline |
 | `automation-health.yml` | `workflow_run: completed` + `workflow_dispatch` | Monitors repo-local shared workflow health and opens current health issues |
 | `codex-pr-normalize.yml` | `pull_request_target: opened, edited` | Normalizes Codex PR title to conventional commit, adds labels, undrafts |
 | `codex-pr-review.yml` | `pull_request_target: opened, synchronize` | Auto-reviews PRs via @codex |
