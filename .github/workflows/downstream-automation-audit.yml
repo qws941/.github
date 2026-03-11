@@ -52,22 +52,32 @@ jobs:
                 .map(item => item.trim())
                 .filter(Boolean)
             );
+            const isRecoverableRun = (workflowPath, run) =>
+              workflowPath === '.github/workflows/auto-approve-runs.yml' &&
+              run.event === 'schedule' &&
+              run.conclusion === 'action_required';
 
             const syncPath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'sync.yml');
             const syncContent = fs.readFileSync(syncPath, 'utf8');
-            const reposBlockMatch = syncContent.match(/repos:\s*\|\n((?:\s{6}.+\n?)*)/);
-            if (!reposBlockMatch) {
+            const repoBlocks = [...syncContent.matchAll(/repos:\s*\|\n((?:\s{6}.+\n?)*)/g)];
+            if (repoBlocks.length === 0) {
               core.setFailed('Unable to parse downstream repos from .github/sync.yml');
               return;
             }
 
-            const targetRepos = reposBlockMatch[1]
-              .split('\n')
-              .map(line => line.trim())
-              .filter(Boolean);
+            const targetRepos = [...new Set(
+              repoBlocks
+                .flatMap(match => match[1].split('\n'))
+                .map(line => line.trim())
+                .filter(Boolean)
+            )].sort();
 
             const workflowPathMatches = [...syncContent.matchAll(/source:\s*(\.github\/workflows\/(?!_)[^\s]+)/g)];
-            const workflowPaths = [...new Set(workflowPathMatches.map(match => match[1]))].sort();
+            const workflowPaths = [...new Set(
+              workflowPathMatches
+                .map(match => match[1])
+                .filter(workflowPath => fs.existsSync(path.join(process.env.GITHUB_WORKSPACE, workflowPath)))
+            )].sort();
             const upstreamWorkflowMeta = new Map();
 
             for (const workflowPath of workflowPaths) {
@@ -261,7 +271,7 @@ jobs:
                     });
                   }
 
-                  if (run.status !== 'completed' || unhealthyConclusions.has(run.conclusion)) {
+                  if ((run.status !== 'completed' || unhealthyConclusions.has(run.conclusion)) && !isRecoverableRun(workflowPath, run)) {
                     findings.push({
                       workflowPath,
                       kind: 'unhealthy-run',
