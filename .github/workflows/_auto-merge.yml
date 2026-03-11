@@ -32,14 +32,102 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'codex') ||
       contains(github.event.pull_request.labels.*.name, 'sync')
     steps:
-      - name: Approve
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr review "$PR_URL" --approve
+      - name: Reconcile auto-merge state
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
 
-      - name: Enable auto-merge
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge "$PR_URL" --squash --auto
+            const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    id
+                    number
+                    url
+                    state
+                    isDraft
+                    mergeable
+                    mergeStateStatus
+                    reviewDecision
+                    autoMergeRequest {
+                      enabledAt
+                    }
+                  }
+                }
+              }
+            `, { owner, repo, number: pull_number });
+
+            const pr = repository.pullRequest;
+            if (!pr) {
+              throw new Error(`Pull request #${pull_number} not found`);
+            }
+
+            if (pr.state !== 'OPEN') {
+              core.notice(`No-op: PR #${pull_number} is ${pr.state}`);
+              return;
+            }
+
+            if (pr.autoMergeRequest) {
+              core.notice(`No-op: auto-merge already enabled for PR #${pull_number}`);
+              return;
+            }
+
+            const humanBlockers = [];
+            if (pr.isDraft) humanBlockers.push('PR is draft');
+            if (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY') {
+              humanBlockers.push('merge conflict requires manual resolution');
+            }
+            if (pr.mergeStateStatus === 'BEHIND') {
+              humanBlockers.push('branch is behind base and needs update');
+            }
+            if (pr.reviewDecision === 'CHANGES_REQUESTED') {
+              humanBlockers.push('changes requested review is blocking merge');
+            }
+
+            if (humanBlockers.length > 0) {
+              core.notice(`Human attention: ${humanBlockers.join('; ')}`);
+              return;
+            }
+
+            try {
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number,
+                event: 'APPROVE',
+              });
+              core.notice(`Approved PR #${pull_number}`);
+            } catch (e) {
+              const message = String(e.message || '');
+              if (e.status === 422 || /approve your own pull request|review already exists|pending review/i.test(message)) {
+                core.notice(`Approval step skipped: ${message}`);
+              } else {
+                throw e;
+              }
+            }
+
+            try {
+              await github.graphql(`
+                mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) {
+                    pullRequest {
+                      autoMergeRequest {
+                        enabledAt
+                      }
+                    }
+                  }
+                }
+              `, { pullRequestId: pr.id });
+              core.notice(`Enabled auto-merge for PR #${pull_number}`);
+            } catch (e) {
+              const message = String(e.message || '');
+              if (/draft|merge conflict|changes requested|review|required review|behind|base branch policy|not in clean status|cannot enable auto-merge/i.test(message)) {
+                core.notice(`Human attention: ${message}`);
+                return;
+              }
+              throw e;
+            }

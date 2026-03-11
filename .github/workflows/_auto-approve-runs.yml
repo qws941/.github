@@ -106,6 +106,19 @@ jobs:
                 core.warning(`Failed to rerun action_required run #${run.id}: ${e.message}`);
               }
             };
+            const rerunCancelledAutoMerge = async run => {
+              try {
+                await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun', {
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                rerunFailed++;
+                core.info(`Reran cancelled Auto Merge run #${run.id} (${run.name})`);
+              } catch (e) {
+                core.warning(`Failed to rerun cancelled Auto Merge run #${run.id}: ${e.message}`);
+              }
+            };
 
             if (eventName === 'pull_request_target' && prNumber) {
               try {
@@ -174,6 +187,30 @@ jobs:
               }
             } catch (e) {
               core.warning(`Failed to list failed runs: ${e.message}`);
+            }
+
+            try {
+              const { data: cancelledRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                status: 'completed',
+                per_page: 100,
+                created: `>=${since}`,
+              });
+
+              const eligibleCancelledRuns = cancelledRuns.workflow_runs.filter(run =>
+                run.name === 'Auto Merge' &&
+                run.conclusion === 'cancelled' &&
+                run.run_attempt === 1 &&
+                isTrustedRun(run) &&
+                isManagedPrRun(run)
+              );
+
+              for (const run of eligibleCancelledRuns) {
+                await rerunCancelledAutoMerge(run);
+              }
+            } catch (e) {
+              core.warning(`Failed to list cancelled Auto Merge runs: ${e.message}`);
             }
 
             core.info(`Done: ${rerunPending} action_required approved, ${rerunFailed} failure rerun`);
