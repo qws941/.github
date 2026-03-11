@@ -90,7 +90,7 @@ func main() {
 	skipSync := flag.Bool("skip-sync", false, "Skip sync.yml update")
 	skipLabels := flag.Bool("skip-labels", false, "Skip label sync")
 	skipWebhooks := flag.Bool("skip-webhooks", false, "Skip webhook creation")
-	skipDependabot := flag.Bool("skip-dependabot", false, "Skip dependabot.yml generation")
+	skipDependabot := flag.Bool("skip-dependabot", true, "Skip dependabot.yml generation (default: true)")
 	flag.Parse()
 
 	args := flag.Args()
