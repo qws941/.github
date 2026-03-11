@@ -76,6 +76,36 @@ jobs:
               run.conclusion === 'action_required' &&
               Array.isArray(run.pull_requests) &&
               run.pull_requests.some(pr => pr.number === prNumber);
+            const unblockActionRequiredRun = async run => {
+              try {
+                await github.rest.actions.approveWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                rerunPending++;
+                core.info(`Approved action_required run #${run.id} (${run.name})`);
+                return;
+              } catch (e) {
+                const message = String(e.message || '');
+                if (!message.includes('not from a fork pull request')) {
+                  core.warning(`Failed to approve action_required run #${run.id}: ${message}`);
+                  return;
+                }
+              }
+
+              try {
+                await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun', {
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                rerunPending++;
+                core.info(`Reran action_required run #${run.id} (${run.name})`);
+              } catch (e) {
+                core.warning(`Failed to rerun action_required run #${run.id}: ${e.message}`);
+              }
+            };
 
             if (eventName === 'pull_request_target' && prNumber) {
               try {
@@ -86,17 +116,7 @@ jobs:
                 });
 
                 for (const run of runs.workflow_runs.filter(isTargetRun)) {
-                  try {
-                    await github.rest.actions.approveWorkflowRun({
-                      owner,
-                      repo,
-                      run_id: run.id,
-                    });
-                    rerunPending++;
-                    core.info(`Approved PR-linked action_required run #${run.id} (${run.name})`);
-                  } catch (e) {
-                    core.warning(`Failed to approve PR-linked run #${run.id}: ${e.message}`);
-                  }
+                  await unblockActionRequiredRun(run);
                 }
               } catch (e) {
                 core.warning(`Failed to inspect PR-linked workflow runs for #${prNumber}: ${e.message}`);
@@ -116,17 +136,7 @@ jobs:
               });
 
               for (const run of pendingRuns.workflow_runs.filter(r => r.name !== 'Auto Approve Runs' && isTrustedRun(r) && isManagedPrRun(r))) {
-                try {
-                  await github.rest.actions.approveWorkflowRun({
-                    owner,
-                    repo,
-                    run_id: run.id,
-                  });
-                  rerunPending++;
-                  core.info(`Approved action_required run #${run.id} (${run.name})`);
-                } catch (e) {
-                  core.warning(`Failed to approve action_required run #${run.id}: ${e.message}`);
-                }
+                await unblockActionRequiredRun(run);
               }
             } catch (e) {
               core.warning(`Failed to list action_required runs: ${e.message}`);
