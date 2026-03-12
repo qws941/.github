@@ -65,7 +65,6 @@ type webhookDef struct {
 var standardWebhooks = []webhookDef{
 	{"github-pr", mcphubBase + "/github-pr", []string{"pull_request", "pull_request_review", "push"}},
 	{"github-issue", mcphubBase + "/github-issue", []string{"issues", "issue_comment"}},
-	{"glitchtip-error", mcphubBase + "/glitchtip-error", []string{"check_run", "push", "workflow_run"}},
 	{"grafana-alert", mcphubBase + "/grafana-alert", []string{"check_suite", "workflow_run"}},
 	{"n8n-pr-auto-approve", n8nBase + "/pr-auto-approve", []string{"pull_request"}},
 }
