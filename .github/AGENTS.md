@@ -23,7 +23,7 @@
 | Task | Location | Notes |
 |------|----------|-------|
 | Change what syncs downstream | `.github/sync.yml` | Keep repo list sorted and synced files generic |
-| Tune PR path labels | `.github/labeler.yml` | Eight label buckets map file globs to labels |
+| Tune PR path labels | `.github/labeler.yml` | Five label buckets map file globs to SSoT labels |
 | Tune release note grouping | `.github/release-drafter.yml` | Category-to-changelog mapping |
 | Edit issue forms | `.github/ISSUE_TEMPLATE/*.yml` | All four forms sync downstream |
 | Change workflow behavior | `.github/workflows/AGENTS.md` | Deeper contract for templates/callers/orchestrators |

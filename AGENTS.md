@@ -17,8 +17,11 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 │   └── ISSUE_TEMPLATE/   # synced issue forms
 ├── scripts/              # Go CLIs + label SSoT; child AGENTS applies
 ├── profile/              # GitHub account profile README
+├── .editorconfig
 ├── AGENTS.md
+├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
+├── LICENSE
 ├── OWNERS
 └── SECURITY.md
 ```
@@ -70,7 +73,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 
 - Personal-account `.github` repo, so reusable workflow references use the double path `qws941/.github/.github/workflows/_*.yml@master`.
 - The workflow directory mixes three patterns in one flat tree: reusable templates, synced thin callers, and upstream-only orchestrators/audits.
-- Verification is workflow-driven rather than test-driven; the repo intentionally has no test directory.
+- Verification is workflow-driven; build-tagged Go test files exist (`//go:build onboard_repo`, `//go:build sync_labels`) but there is no unified test suite.
 
 ## COMMANDS
 

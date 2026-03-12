@@ -44,6 +44,6 @@
 
 ## NOTES
 
-- Current shape: 47 workflows total, including 23 reusable templates and 20 synced callers plus upstream-only orchestrators.
+- Current shape: 49 workflows total, including 24 reusable templates and 25 synced callers plus upstream-only orchestrators.
 - Representative caller/template pair: `auto-merge.yml` -> `_auto-merge.yml`.
 - `downstream-automation-audit.yml` fingerprints findings and opens issues in downstream repos when shared automation degrades.
