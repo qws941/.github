@@ -30,7 +30,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | Add or remove synced files | `.github/sync.yml` | Canonical sync manifest and downstream repo list |
 | Edit GitHub config surfaces | `.github/AGENTS.md` | Sync rules, forms, labeler, release drafter |
 | Edit workflow behavior | `.github/workflows/AGENTS.md` | Template/caller split and upstream-only workflows |
-| Update label automation | `scripts/AGENTS.md` | `labels.yml`, `sync-labels.go`, `onboard-repo.go` |
+| Update label automation | `scripts/AGENTS.md` | `labels.yml`, `sync-labels.go`, `onboard-repo.go`, `git-flow.go` |
 | Change issue forms | `.github/ISSUE_TEMPLATE/*.yml` | Synced to downstream repos; keep generic |
 | Update contribution policy | `CONTRIBUTING.md` | Trunk-based dev, commit format, review rules |
 | Update security contact/process | `SECURITY.md` | `security@jclee.me`, 48h acknowledgement SLA |
@@ -46,6 +46,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | `stepSyncYml` | function | `scripts/onboard-repo.go` | Adds a target repo to `.github/sync.yml` |
 | `main` | function | `scripts/sync-labels.go` | Runs label sync CLI and worker-pool fan-out |
 | `syncRepo` | function | `scripts/sync-labels.go` | Creates, updates, or deletes labels per target repo |
+| `main` | function | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync git-flow subcommands |
 
 ## CONVENTIONS
 
@@ -76,6 +77,11 @@ go run scripts/sync-labels.go --dry-run
 go run scripts/sync-labels.go --repo qws941/terraform
 go run scripts/sync-labels.go --delete
 go run scripts/onboard-repo.go --dry-run qws941/new-repo
+go run scripts/git-flow.go status
+go run scripts/git-flow.go start --dry-run feat/my-feature
+go run scripts/git-flow.go pr --dry-run
+go run scripts/git-flow.go finish --dry-run
+go run scripts/git-flow.go sync --dry-run
 ```
 
 ## NOTES

@@ -17,6 +17,7 @@ Thumbs.db
 onboard-repo
 preview-sync
 sync-labels
+git-flow
 
 # Go workspace (local dev only)
 go.work

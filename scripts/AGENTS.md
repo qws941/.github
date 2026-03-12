@@ -2,12 +2,13 @@
 
 ## OVERVIEW
 
-`scripts/` holds the repo's only executable source code: two Go CLIs for repo onboarding and label synchronization, plus the label SSoT data file they operate on.
+`scripts/` holds the repo's only executable source code: three Go CLIs for repo onboarding, label synchronization, and developer git-flow automation, plus the label SSoT data file they operate on.
 
 ## STRUCTURE
 
 ```text
 scripts/
+├── git-flow.go       # developer git-flow automation CLI
 ├── labels.yml        # 27 standard labels shared across downstream repos
 ├── onboard-repo.go   # repo onboarding CLI
 └── sync-labels.go    # label sync CLI with worker pool
@@ -21,6 +22,7 @@ scripts/
 | Change label sync behavior | `scripts/sync-labels.go` | Supports `--dry-run`, `--repo`, `--delete`, `--workers` |
 | Change onboarding flow | `scripts/onboard-repo.go` | Updates `sync.yml`, syncs labels, creates webhooks, verifies results |
 | Change verification output | `scripts/sync-labels.go` `printSummary`, `scripts/onboard-repo.go` `stepVerify` | Human-readable operator output |
+| Automate git-flow lifecycle | `scripts/git-flow.go` | Branch creation, PR, merge, sync, status — supports `--dry-run` |
 
 ## CODE MAP
 
@@ -33,6 +35,12 @@ scripts/
 | `stepSyncYml` | `scripts/onboard-repo.go` | Adds a repo to `.github/sync.yml` |
 | `stepVerify` | `scripts/onboard-repo.go` | Confirms sync, labels, hooks, and dependabot state |
 
+| `main` | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync subcommands |
+| `cmdStart` | `scripts/git-flow.go` | Creates a validated feature branch from master |
+| `cmdPR` | `scripts/git-flow.go` | Pushes and creates a PR with auto-generated title and body |
+| `cmdFinish` | `scripts/git-flow.go` | Squash-merges PR, deletes branch, returns to master |
+| `cmdStatus` | `scripts/git-flow.go` | Read-only branch and PR status summary |
+| `cmdSync` | `scripts/git-flow.go` | Rebases feature branch onto origin/master |
 ## CONVENTIONS
 
 - These CLIs are stdlib-oriented Go programs that shell out to `gh` instead of using a Go GitHub SDK.
@@ -40,12 +48,14 @@ scripts/
 - `sync-labels.go` treats `scripts/labels.yml` as the only label source of truth.
 - `onboard-repo.go` defaults bare repo names to `qws941/<repo>` and keeps sync manifest edits alphabetical.
 
+- `git-flow.go` automates the trunk-based development lifecycle: branch creation → PR → merge → cleanup.
 ## ANTI-PATTERNS (THIS SUBTREE)
 
 - Do not add labels directly in code when they belong in `scripts/labels.yml`.
 - Do not remove dry-run or worker-pool behavior from the CLIs.
 - Do not add third-party Go dependencies for work already handled by the stdlib plus `gh`.
 - Do not change sync-manifest or webhook logic without keeping `stepVerify` aligned.
+- Do not bypass git-flow branch-name validation pattern; it enforces the project's branch naming convention.
 
 ## COMMANDS
 
@@ -54,4 +64,9 @@ go run scripts/sync-labels.go --dry-run
 go run scripts/sync-labels.go --repo qws941/opencode
 go run scripts/sync-labels.go --delete
 go run scripts/onboard-repo.go --dry-run qws941/new-repo
+go run scripts/git-flow.go status
+go run scripts/git-flow.go start --dry-run feat/my-feature
+go run scripts/git-flow.go pr --dry-run
+go run scripts/git-flow.go finish --dry-run
+go run scripts/git-flow.go sync --dry-run
 ```
