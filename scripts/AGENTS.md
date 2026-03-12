@@ -55,6 +55,7 @@ scripts/
 - `onboard-repo.go` defaults bare repo names to `qws941/<repo>` and keeps sync manifest edits alphabetical.
 - `git-flow.go` automates the trunk-based development lifecycle: branch creation → PR → merge → cleanup.
 - `git-flow.go` finish gates: PR must be open, not draft, mergeable, and all CI checks passed (pending checks block merge).
+
 ## ANTI-PATTERNS (THIS SUBTREE)
 
 - Do not add labels directly in code when they belong in `scripts/labels.yml`.
