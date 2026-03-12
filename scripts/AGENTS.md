@@ -34,7 +34,6 @@ scripts/
 | `main` | `scripts/onboard-repo.go` | Orchestrates the 5-step onboarding flow |
 | `stepSyncYml` | `scripts/onboard-repo.go` | Adds a repo to `.github/sync.yml` |
 | `stepVerify` | `scripts/onboard-repo.go` | Confirms sync, labels, hooks, and dependabot state |
-
 | `main` | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync subcommands |
 | `cmdStart` | `scripts/git-flow.go` | Creates a validated feature branch from master |
 | `cmdPR` | `scripts/git-flow.go` | Pushes and creates a PR with auto-generated title and body |
@@ -43,6 +42,7 @@ scripts/
 | `cmdSync` | `scripts/git-flow.go` | Rebases feature branch onto origin/master |
 | `requireCleanWorktree` | `scripts/git-flow.go` | Guards mutating commands against dirty worktree |
 | `requireFeatureBranch` | `scripts/git-flow.go` | Validates current branch is a feature branch matching `branchPattern` |
+| `generatedTitle` | `scripts/git-flow.go` | Infers PR title from branch name with scope prefix |
 | `generatedBody` | `scripts/git-flow.go` | Generates PR body with 8 template sections (What/Why/Kind/Changes/Testing/Breaking/Checklist/Issues) |
 | `resolveCheckConclusion` | `scripts/git-flow.go` | Normalizes CI check status across CheckRun and StatusContext objects |
 | `statusChecksSummary` | `scripts/git-flow.go` | Aggregates CI check results into pass/fail/pending summary |
