@@ -128,29 +128,6 @@ jobs:
               }
             }
 
-      - name: Request Codex review
-        if: >-
-          github.event.action == 'opened' &&
-          github.event.pull_request.user.login != 'dependabot[bot]'
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-
-            // Skip sync PRs
-            if (pr.labels.some(l => l.name === 'sync')) {
-              core.info('Skipping Codex review for sync PR');
-              return;
-            }
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              body: '@codex review'
-            });
-
-            core.info(`Requested Codex review on PR #${pr.number}`);
 
   # When PR merges, add resolution comment to linked issues
   pr-merged:
@@ -209,6 +186,64 @@ jobs:
                 core.info(`Commented on issue #${issueNumber}`);
               } catch (error) {
                 core.warning(`Failed to comment on issue #${issueNumber}: ${error.message}`);
+              }
+            }
+
+  # When PR closes WITHOUT merge, clean up linked issue labels
+  pr-closed-unmerged:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
+      - name: Clean up linked issues
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const issuePattern = /(?:fixes|closes|resolves)\s+#(\d+)/gi;
+            const linkedIssues = [];
+            let match;
+            while ((match = issuePattern.exec(body)) !== null) {
+              linkedIssues.push(parseInt(match[1], 10));
+            }
+
+            if (linkedIssues.length === 0) return;
+
+            const closeComment = [
+              `❌ PR #${pr.number} was closed without merging.`,
+              '',
+              `**Branch:** \`${pr.head.ref}\``,
+              'Issue remains open for further work.',
+            ].join('\n');
+
+            for (const issueNumber of linkedIssues) {
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: closeComment
+                });
+
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name: 'status:in-progress'
+                }).catch(() => {});
+
+                core.info(`Cleaned up issue #${issueNumber} after unmerged PR close`);
+              } catch (error) {
+                core.warning(`Failed to clean issue #${issueNumber}: ${error.message}`);
               }
             }
 

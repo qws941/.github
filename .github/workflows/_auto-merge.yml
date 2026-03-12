@@ -24,12 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]' ||
-      github.event.pull_request.user.login == 'chatgpt-codex-connector[bot]' ||
-      github.event.pull_request.user.login == 'openai-code-agent[bot]' ||
-      github.event.pull_request.user.login == 'Codex' ||
       github.event.pull_request.user.login == github.repository_owner ||
       contains(github.event.pull_request.labels.*.name, 'auto-merge') ||
-      contains(github.event.pull_request.labels.*.name, 'codex') ||
       contains(github.event.pull_request.labels.*.name, 'sync')
     steps:
       - name: Harden Runner
@@ -94,7 +90,24 @@ jobs:
             }
 
             if (humanBlockers.length > 0) {
-              core.notice(`Human attention: ${humanBlockers.join('; ')}`);
+              const msg = '⚠️ **Auto-merge blocked** — ' + humanBlockers.join('; ') + '.\n\nManual attention required.';
+              core.notice(msg);
+
+              // Comment on PR so the blocker is visible
+              try {
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner, repo, issue_number: pull_number, per_page: 50,
+                });
+                const hasBlocker = comments.some(c => c.body?.includes('⚠️ **Auto-merge blocked**'));
+                if (!hasBlocker) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: pull_number, body: msg,
+                  });
+                }
+              } catch (e) {
+                core.warning(`Failed to comment blocker on PR: ${e.message}`);
+              }
+
               return;
             }
 

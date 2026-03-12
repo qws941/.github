@@ -17,8 +17,11 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 │   └── ISSUE_TEMPLATE/   # synced issue forms
 ├── scripts/              # Go CLIs + label SSoT; child AGENTS applies
 ├── profile/              # GitHub account profile README
+├── .editorconfig
 ├── AGENTS.md
+├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
+├── LICENSE
 ├── OWNERS
 └── SECURITY.md
 ```
@@ -30,7 +33,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | Add or remove synced files | `.github/sync.yml` | Canonical sync manifest and downstream repo list |
 | Edit GitHub config surfaces | `.github/AGENTS.md` | Sync rules, forms, labeler, release drafter |
 | Edit workflow behavior | `.github/workflows/AGENTS.md` | Template/caller split and upstream-only workflows |
-| Update label automation | `scripts/AGENTS.md` | `labels.yml`, `sync-labels.go`, `onboard-repo.go` |
+| Update label automation | `scripts/AGENTS.md` | `labels.yml`, `sync-labels.go`, `onboard-repo.go`, `git-flow.go` |
 | Change issue forms | `.github/ISSUE_TEMPLATE/*.yml` | Synced to downstream repos; keep generic |
 | Update contribution policy | `CONTRIBUTING.md` | Trunk-based dev, commit format, review rules |
 | Update security contact/process | `SECURITY.md` | `security@jclee.me`, 48h acknowledgement SLA |
@@ -46,6 +49,9 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | `stepSyncYml` | function | `scripts/onboard-repo.go` | Adds a target repo to `.github/sync.yml` |
 | `main` | function | `scripts/sync-labels.go` | Runs label sync CLI and worker-pool fan-out |
 | `syncRepo` | function | `scripts/sync-labels.go` | Creates, updates, or deletes labels per target repo |
+| `main` | function | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync git-flow subcommands |
+| `cmdFinish` | function | `scripts/git-flow.go` | Squash-merges PR after CI, draft, and mergeable gates pass |
+| `resolveCheckConclusion` | function | `scripts/git-flow.go` | Normalizes CI check status across CheckRun and StatusContext objects |
 
 ## CONVENTIONS
 
@@ -67,7 +73,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 
 - Personal-account `.github` repo, so reusable workflow references use the double path `qws941/.github/.github/workflows/_*.yml@master`.
 - The workflow directory mixes three patterns in one flat tree: reusable templates, synced thin callers, and upstream-only orchestrators/audits.
-- Verification is workflow-driven rather than test-driven; the repo intentionally has no test directory.
+- Verification is workflow-driven; build-tagged Go test files exist (`//go:build onboard_repo`, `//go:build sync_labels`) but there is no unified test suite.
 
 ## COMMANDS
 
@@ -76,6 +82,11 @@ go run scripts/sync-labels.go --dry-run
 go run scripts/sync-labels.go --repo qws941/terraform
 go run scripts/sync-labels.go --delete
 go run scripts/onboard-repo.go --dry-run qws941/new-repo
+go run scripts/git-flow.go status
+go run scripts/git-flow.go start --dry-run feat/my-feature
+go run scripts/git-flow.go pr --dry-run
+go run scripts/git-flow.go finish --dry-run
+go run scripts/git-flow.go sync --dry-run
 ```
 
 ## NOTES

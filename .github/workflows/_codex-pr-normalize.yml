@@ -117,33 +117,8 @@ jobs:
               console.log('No changes needed — title is conventional, issue already linked.');
             }
 
-            // Ensure codex + auto-merge labels
-            const existing = pr.labels.map(l => l.name);
-            const add = ['codex', 'auto-merge'].filter(l => !existing.includes(l));
-            if (add.length > 0) {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                labels: add
-              });
-              console.log(`Added labels: ${add.join(', ')}`);
-            }
-
-            // Undraft if PR is a draft — required for auto-merge
-            if (pr.draft) {
-              await github.graphql(`
-                mutation($id: ID!) {
-                  markPullRequestReadyForReview(input: { pullRequestId: $id }) {
-                    pullRequest { isDraft }
-                  }
-                }
-              `, { id: pr.node_id });
-              console.log('Marked PR as ready for review (was draft)');
-            }
-
-            // Check PR diff size — block auto-merge for oversized PRs
-            const { data: prFiles } = await github.rest.pulls.listFiles({
+            // Check PR diff size before deciding labels
+            const prFiles = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
@@ -168,8 +143,38 @@ jobs:
               console.log('Closed empty PR (0 changes)');
               return;
             }
-            if (totalChanges > 500) {
-              // Remove auto-merge label for oversized PRs
+
+            const isOversized = totalChanges > 500;
+
+            // Add labels — only include auto-merge for eligible (<=500 LOC) PRs
+            const existing = pr.labels.map(l => l.name);
+            const wantLabels = isOversized ? ['codex'] : ['codex', 'auto-merge'];
+            const add = wantLabels.filter(l => !existing.includes(l));
+            if (add.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: add
+              });
+              console.log(`Added labels: ${add.join(', ')}`);
+            }
+
+            // Undraft if PR is a draft — required for auto-merge
+            if (pr.draft) {
+              await github.graphql(`
+                mutation($id: ID!) {
+                  markPullRequestReadyForReview(input: { pullRequestId: $id }) {
+                    pullRequest { isDraft }
+                  }
+                }
+              `, { id: pr.node_id });
+              console.log('Marked PR as ready for review (was draft)');
+            }
+
+            // Defensive: handle oversized PRs (remove stale auto-merge label + disable + warn)
+            if (isOversized) {
+              // Remove auto-merge label if it was pre-existing
               try {
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
@@ -180,6 +185,22 @@ jobs:
                 console.log(`Removed auto-merge label — PR exceeds 500 LOC (${totalChanges})`);
               } catch (e) {
                 if (e.status !== 404) throw e;
+              }
+
+              // Disable auto-merge if already enabled
+              try {
+                await github.graphql(`
+                  mutation($pullRequestId: ID!) {
+                    disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) {
+                      pullRequest { autoMergeRequest { enabledAt } }
+                    }
+                  }
+                `, { pullRequestId: pr.node_id });
+                console.log('Disabled auto-merge for oversized PR');
+              } catch (e) {
+                if (!/not enabled|auto.merge/i.test(String(e.message || ''))) {
+                  core.warning(`Failed to disable auto-merge: ${e.message}`);
+                }
               }
 
               // Add warning comment if not already posted
