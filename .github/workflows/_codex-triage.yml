@@ -23,7 +23,7 @@ jobs:
     name: Triage failure issues
     runs-on: ubuntu-latest
     if: >-
-      (github.event.action == 'opened' && (
+      ((github.event.action == 'opened' || github.event.action == 'edited') && (
         contains(github.event.issue.title, 'failed') ||
         contains(github.event.issue.title, 'failure') ||
         contains(github.event.issue.title, 'Failed') ||

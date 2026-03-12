@@ -24,12 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]' ||
-      github.event.pull_request.user.login == 'chatgpt-codex-connector[bot]' ||
-      github.event.pull_request.user.login == 'openai-code-agent[bot]' ||
-      github.event.pull_request.user.login == 'Codex' ||
       github.event.pull_request.user.login == github.repository_owner ||
       contains(github.event.pull_request.labels.*.name, 'auto-merge') ||
-      contains(github.event.pull_request.labels.*.name, 'codex') ||
       contains(github.event.pull_request.labels.*.name, 'sync')
     steps:
       - name: Harden Runner
