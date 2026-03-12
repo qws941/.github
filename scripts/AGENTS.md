@@ -38,17 +38,23 @@ scripts/
 | `main` | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync subcommands |
 | `cmdStart` | `scripts/git-flow.go` | Creates a validated feature branch from master |
 | `cmdPR` | `scripts/git-flow.go` | Pushes and creates a PR with auto-generated title and body |
-| `cmdFinish` | `scripts/git-flow.go` | Squash-merges PR, deletes branch, returns to master |
+| `cmdFinish` | `scripts/git-flow.go` | Squash-merges PR after CI, draft, and mergeable gates pass |
 | `cmdStatus` | `scripts/git-flow.go` | Read-only branch and PR status summary |
 | `cmdSync` | `scripts/git-flow.go` | Rebases feature branch onto origin/master |
+| `requireCleanWorktree` | `scripts/git-flow.go` | Guards mutating commands against dirty worktree |
+| `requireFeatureBranch` | `scripts/git-flow.go` | Validates current branch is a feature branch matching `branchPattern` |
+| `generatedBody` | `scripts/git-flow.go` | Generates PR body with 8 template sections (What/Why/Kind/Changes/Testing/Breaking/Checklist/Issues) |
+| `resolveCheckConclusion` | `scripts/git-flow.go` | Normalizes CI check status across CheckRun and StatusContext objects |
+| `statusChecksSummary` | `scripts/git-flow.go` | Aggregates CI check results into pass/fail/pending summary |
+
 ## CONVENTIONS
 
 - These CLIs are stdlib-oriented Go programs that shell out to `gh` instead of using a Go GitHub SDK.
 - Dry-run support is first-class; prefer preview mode before mutating downstream repos.
 - `sync-labels.go` treats `scripts/labels.yml` as the only label source of truth.
 - `onboard-repo.go` defaults bare repo names to `qws941/<repo>` and keeps sync manifest edits alphabetical.
-
 - `git-flow.go` automates the trunk-based development lifecycle: branch creation → PR → merge → cleanup.
+- `git-flow.go` finish gates: PR must be open, not draft, mergeable, and all CI checks passed (pending checks block merge).
 ## ANTI-PATTERNS (THIS SUBTREE)
 
 - Do not add labels directly in code when they belong in `scripts/labels.yml`.

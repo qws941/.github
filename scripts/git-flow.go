@@ -306,27 +306,76 @@ func generatedTitle(branch, explicitScope string) string {
 	return fmt.Sprintf("%s: %s", branchType, desc)
 }
 
-func generatedBody(files []string) string {
+func generatedBody(branch string, files []string) string {
+	branchType := ""
+	if idx := strings.Index(branch, "/"); idx > 0 {
+		branchType = branch[:idx]
+	}
+
+	kindMap := map[string]string{
+		"feat":     "/kind feat",
+		"fix":      "/kind fix",
+		"refactor": "/kind refactor",
+		"ci":       "/kind infra",
+		"build":    "/kind infra",
+		"docs":     "/kind docs",
+		"chore":    "/kind chore",
+		"perf":     "/kind refactor",
+		"test":     "/kind chore",
+		"revert":   "/kind fix",
+	}
+	matchedKind := kindMap[branchType]
+
+	type kindEntry struct {
+		label, kind string
+	}
+	kinds := []kindEntry{
+		{"New feature or capability", "/kind feat"},
+		{"Bug fix (non-breaking)", "/kind fix"},
+		{"Code restructuring (no behavior change)", "/kind refactor"},
+		{"Infrastructure, Terraform, CI/CD, deployment", "/kind infra"},
+		{"Documentation only", "/kind docs"},
+		{"Maintenance, dependencies, tooling", "/kind chore"},
+		{"Breaking change (requires migration or coordination)", "/kind breaking"},
+	}
+
 	var b strings.Builder
 	b.WriteString("## What This PR Does\n\n")
 	b.WriteString("<!-- Describe WHAT this PR changes. Be specific. -->\n\n")
 	b.WriteString("## Why\n\n")
 	b.WriteString("<!-- Explain WHY this change is needed. Link to the problem or motivation. -->\n\n")
-	b.WriteString("## Changes\n\n")
+	b.WriteString("## Kind\n\n")
+	for _, k := range kinds {
+		check := " "
+		if k.kind == matchedKind {
+			check = "x"
+		}
+		fmt.Fprintf(&b, "- [%s] `%s` — %s\n", check, k.kind, k.label)
+	}
+	b.WriteString("\n## Changes\n\n")
 	if len(files) == 0 {
-		b.WriteString("- (no changed files detected against origin/")
-		b.WriteString(baseBranch)
-		b.WriteString("...HEAD)\n")
+		b.WriteString("- (no changed files detected against origin/" + baseBranch + "...HEAD)\n")
 	} else {
 		for _, f := range files {
-			b.WriteString("- ")
-			b.WriteString(f)
-			b.WriteString("\n")
+			b.WriteString("- " + f + "\n")
 		}
 	}
 	b.WriteString("\n## Testing\n\n")
 	b.WriteString("- [ ] Tested locally\n")
 	b.WriteString("- [ ] CI checks pass\n")
+	b.WriteString("- [ ] Infrastructure changes verified (`terraform plan`, deploy preview, etc.) — if applicable\n")
+	b.WriteString("- [ ] Manual verification on staging/prod\n")
+	b.WriteString("\n## Breaking Changes\n\n")
+	b.WriteString("N/A\n")
+	b.WriteString("\n## Checklist\n\n")
+	b.WriteString("- [ ] PR title follows `type(scope): description` format\n")
+	b.WriteString("- [ ] Code follows the project's existing style and conventions\n")
+	b.WriteString("- [ ] Self-review completed\n")
+	b.WriteString("- [ ] Documentation updated (if applicable)\n")
+	b.WriteString("- [ ] No new warnings, errors, or type suppressions\n")
+	b.WriteString("- [ ] Change is **< 200 LOC** (excluding generated/lock files), or justification provided\n")
+	b.WriteString("\n## Related Issues\n\n")
+	b.WriteString("Closes #\n")
 	return b.String()
 }
 
@@ -345,34 +394,52 @@ func parseAheadBehind(out string) (int, int) {
 	return 0, 0
 }
 
+// resolveCheckConclusion extracts the effective conclusion from a GitHub
+// statusCheckRollup item. CheckRun objects use conclusion + status;
+// StatusContext objects use state. Priority: conclusion > state > status.
+func resolveCheckConclusion(obj map[string]any) string {
+	conclusion, _ := obj["conclusion"].(string)
+	if conclusion != "" {
+		return conclusion
+	}
+	state, _ := obj["state"].(string)
+	if state != "" {
+		return state
+	}
+	status, _ := obj["status"].(string)
+	return status
+}
 func statusChecksSummary(raw []json.RawMessage) string {
 	if len(raw) == 0 {
 		return "0/0 passed"
 	}
 	passed := 0
 	failed := 0
+	pending := 0
 	for _, item := range raw {
 		var obj map[string]any
 		if err := json.Unmarshal(item, &obj); err != nil {
 			continue
 		}
-		state, _ := obj["state"].(string)
-		conclusion, _ := obj["conclusion"].(string)
-		if conclusion == "" {
-			conclusion = state
-		}
-		switch strings.ToUpper(conclusion) {
+		effective := resolveCheckConclusion(obj)
+		switch strings.ToUpper(effective) {
 		case "SUCCESS", "PASSED":
 			passed++
 		case "FAILURE", "FAILED", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE":
 			failed++
+		case "QUEUED", "IN_PROGRESS", "PENDING", "EXPECTED":
+			pending++
 		}
 	}
 	total := len(raw)
-	if failed == 0 {
-		return fmt.Sprintf("%d/%d passed", passed, total)
+	parts := []string{fmt.Sprintf("%d/%d passed", passed, total)}
+	if failed > 0 {
+		parts = append(parts, fmt.Sprintf("%d failed", failed))
 	}
-	return fmt.Sprintf("%d/%d passed, %d failed", passed, total, failed)
+	if pending > 0 {
+		parts = append(parts, fmt.Sprintf("%d pending", pending))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func main() {
@@ -486,7 +553,7 @@ func cmdPR(args []string) {
 	}
 	finalBody := strings.TrimSpace(*body)
 	if finalBody == "" {
-		finalBody = generatedBody(files)
+		finalBody = generatedBody(branch, files)
 	}
 
 	fmt.Printf("--- pr: %s ---\n", branch)
@@ -548,20 +615,51 @@ func cmdFinish(args []string) {
 	fmt.Printf("--- finish: %s ---\n", branch)
 	printMode(*dryRun)
 
-	prRaw, err := ghOutput("pr", "view", "--json", "state,url,number")
+	prRaw, err := ghOutput("pr", "view", "--json", "state,url,number,isDraft,mergeable,statusCheckRollup")
 	if err != nil {
 		fatal("resolve pull request: %v", err)
 	}
 	var pr struct {
-		State  string `json:"state"`
-		URL    string `json:"url"`
-		Number int    `json:"number"`
+		State             string            `json:"state"`
+		URL               string            `json:"url"`
+		Number            int               `json:"number"`
+		IsDraft           bool              `json:"isDraft"`
+		Mergeable         string            `json:"mergeable"`
+		StatusCheckRollup []json.RawMessage `json:"statusCheckRollup"`
 	}
 	if err := json.Unmarshal([]byte(prRaw), &pr); err != nil {
 		fatal("parse pull request info: %v", err)
 	}
 	if strings.ToUpper(pr.State) != "OPEN" {
 		fatal("pull request must be OPEN to finish; current state: %s", pr.State)
+	}
+	if pr.IsDraft {
+		fatal("pull request is still a draft; mark as ready before finishing")
+	}
+	if strings.ToUpper(pr.Mergeable) != "MERGEABLE" && strings.ToUpper(pr.Mergeable) != "" {
+		fatal("pull request is not mergeable; current mergeable state: %s", pr.Mergeable)
+	}
+	checks := statusChecksSummary(pr.StatusCheckRollup)
+	hasFailures := false
+	hasPending := false
+	for _, item := range pr.StatusCheckRollup {
+		var obj map[string]any
+		if err := json.Unmarshal(item, &obj); err != nil {
+			continue
+		}
+		effective := resolveCheckConclusion(obj)
+		switch strings.ToUpper(effective) {
+		case "FAILURE", "FAILED", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE":
+			hasFailures = true
+		case "QUEUED", "IN_PROGRESS", "PENDING", "EXPECTED":
+			hasPending = true
+		}
+	}
+	if hasFailures {
+		fatal("CI checks have failures (%s); resolve before finishing", checks)
+	}
+	if hasPending {
+		fatal("CI checks are still running (%s); wait for completion before finishing", checks)
 	}
 	fmt.Printf("PR: #%d %s\n", pr.Number, pr.URL)
 

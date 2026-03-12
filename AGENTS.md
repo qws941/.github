@@ -47,6 +47,8 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | `main` | function | `scripts/sync-labels.go` | Runs label sync CLI and worker-pool fan-out |
 | `syncRepo` | function | `scripts/sync-labels.go` | Creates, updates, or deletes labels per target repo |
 | `main` | function | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync git-flow subcommands |
+| `cmdFinish` | function | `scripts/git-flow.go` | Squash-merges PR after CI, draft, and mergeable gates pass |
+| `resolveCheckConclusion` | function | `scripts/git-flow.go` | Normalizes CI check status across CheckRun and StatusContext objects |
 
 ## CONVENTIONS
 
