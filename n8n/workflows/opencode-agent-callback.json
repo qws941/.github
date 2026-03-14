@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-03-14T12:23:56.166Z",
+    "updatedAt": "2026-03-14T12:29:29.197Z",
     "createdAt": "2026-03-14T11:53:51.387Z",
     "id": "SyANkPq5gdvjZHsI",
     "name": "opencode-agent-callback",
@@ -11,7 +11,7 @@
             "parameters": {
                 "path": "opencode-agent/callback",
                 "httpMethod": "POST",
-                "responseMode": "lastNode"
+                "responseMode": "responseNode"
             },
             "id": "callback-webhook",
             "name": "Receive Callback",
@@ -48,6 +48,21 @@
             "position": [
                 780,
                 300
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify({ received: true, job_id: $json.body?.job_id || \"unknown\", status: $json.body?.status || \"unknown\" }) }}"
+            },
+            "id": "callback-respond",
+            "name": "Respond OK",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                1080,
+                300
             ]
         }
     ],
@@ -66,6 +81,11 @@
         "Log & Route Callback": {
             "main": [
                 [
+                    {
+                        "node": "Respond OK",
+                        "type": "main",
+                        "index": 0
+                    },
                     {
                         "node": "Notify via Slack",
                         "type": "main",
@@ -88,9 +108,9 @@
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
-    "activeVersionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
-    "versionCounter": 7,
+    "versionId": "c4badedf-680d-416e-b395-486a824effa5",
+    "activeVersionId": "c4badedf-680d-416e-b395-486a824effa5",
+    "versionCounter": 11,
     "triggerCount": 1,
     "shared": [
         {
@@ -113,16 +133,16 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-03-14T12:23:56.166Z",
-        "createdAt": "2026-03-14T12:23:56.166Z",
-        "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+        "updatedAt": "2026-03-14T12:29:29.198Z",
+        "createdAt": "2026-03-14T12:29:29.198Z",
+        "versionId": "c4badedf-680d-416e-b395-486a824effa5",
         "workflowId": "SyANkPq5gdvjZHsI",
         "nodes": [
             {
                 "parameters": {
                     "path": "opencode-agent/callback",
                     "httpMethod": "POST",
-                    "responseMode": "lastNode"
+                    "responseMode": "responseNode"
                 },
                 "id": "callback-webhook",
                 "name": "Receive Callback",
@@ -159,6 +179,21 @@
                 "position": [
                     780,
                     300
+                ],
+                "onError": "continueRegularOutput"
+            },
+            {
+                "parameters": {
+                    "respondWith": "json",
+                    "responseBody": "={{ JSON.stringify({ received: true, job_id: $json.body?.job_id || \"unknown\", status: $json.body?.status || \"unknown\" }) }}"
+                },
+                "id": "callback-respond",
+                "name": "Respond OK",
+                "type": "n8n-nodes-base.respondToWebhook",
+                "typeVersion": 1.1,
+                "position": [
+                    1080,
+                    300
                 ]
             }
         ],
@@ -178,6 +213,11 @@
                 "main": [
                     [
                         {
+                            "node": "Respond OK",
+                            "type": "main",
+                            "index": 0
+                        },
+                        {
                             "node": "Notify via Slack",
                             "type": "main",
                             "index": 0
@@ -192,10 +232,10 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-03-14T12:23:56.766Z",
-                "id": 54,
+                "createdAt": "2026-03-14T12:29:41.512Z",
+                "id": 56,
                 "workflowId": "SyANkPq5gdvjZHsI",
-                "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+                "versionId": "c4badedf-680d-416e-b395-486a824effa5",
                 "event": "activated",
                 "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
             }
