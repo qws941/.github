@@ -1,0 +1,392 @@
+{
+  "id": "vLpLo8YauIrujzZt",
+  "name": "HYCU LMS Attendance",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "typeVersion": 1.2,
+      "id": "schedule-trigger",
+      "name": "Weekday 17:00 KST",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "expression": "0 8 * * 1-5",
+              "field": "cronExpression"
+            }
+          ]
+        }
+      },
+      "position": [
+        250,
+        300
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger"
+    },
+    {
+      "id": "run-attendance",
+      "name": "Run Attendance",
+      "parameters": {
+        "sendHeaders": true,
+        "url": "={{ $env.HYCU_SERVICE_URL }}/api/attend",
+        "authentication": "none",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.HYCU_SERVICE_API_KEY }}"
+            }
+          ]
+        },
+        "method": "POST",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "position": [
+        470,
+        300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "position": [
+        690,
+        300
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "id": "check-result",
+      "name": "Check Result",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "rightValue": "",
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "leftValue": "",
+            "typeValidation": "strict",
+            "caseSensitive": true
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "typeVersion": 2,
+      "id": "format-success",
+      "name": "Format Success",
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst s = (r.data && r.data.summary) || {};\nconst processed = s.processed || 0;\nconst succeeded = s.succeeded || 0;\nconst courses = s.coursesDiscovered || 0;\n\nreturn [{\n  json: {\n    channel: 'C0A1RFH7VL4',\n    text: `✅ *HYCU 수강 출석 완료*\\n과목: ${courses}개 | 처리: ${processed}건 | 성공: ${succeeded}건`\n  }\n}];"
+      },
+      "position": [
+        910,
+        150
+      ],
+      "type": "n8n-nodes-base.code"
+    },
+    {
+      "id": "wait-retry",
+      "name": "Wait 60s",
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "amount": 60
+      },
+      "position": [
+        910,
+        450
+      ],
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1
+    },
+    {
+      "position": [
+        1130,
+        450
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true,
+      "id": "retry-attendance",
+      "name": "Retry Attendance",
+      "parameters": {
+        "method": "POST",
+        "options": {
+          "timeout": 180000
+        },
+        "sendHeaders": true,
+        "url": "={{ $env.HYCU_SERVICE_URL }}/api/attend",
+        "authentication": "none",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.HYCU_SERVICE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "position": [
+        1350,
+        450
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "id": "check-retry",
+      "name": "Check Retry",
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "conditions": [
+            {
+              "id": "retry-check",
+              "leftValue": "={{ $json.success }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "typeValidation": "strict",
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "typeVersion": 2,
+      "id": "format-retry-ok",
+      "name": "Format Retry OK",
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst s = (r.data && r.data.summary) || {};\nconst processed = s.processed || 0;\nconst succeeded = s.succeeded || 0;\nconst courses = s.coursesDiscovered || 0;\n\nreturn [{\n  json: {\n    channel: 'C0A1RFH7VL4',\n    text: `✅ *HYCU 수강 출석 완료 (재시도 성공)*\\n과목: ${courses}개 | 처리: ${processed}건 | 성공: ${succeeded}건`\n  }\n}];"
+      },
+      "position": [
+        1570,
+        350
+      ],
+      "type": "n8n-nodes-base.code"
+    },
+    {
+      "position": [
+        1570,
+        550
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "format-failure",
+      "name": "Format Failure",
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst isN8nError = r.error === true;\nlet errorMsg;\n\nif (isN8nError) {\n  errorMsg = `HTTP_${r.httpCode || '???'}: ${r.message || 'Unknown'}`;\n} else if (r.error && typeof r.error === 'object') {\n  errorMsg = `${r.error.code || 'ERROR'}: ${r.error.message || 'Unknown'}`;\n} else {\n  errorMsg = r.message || r.error || 'Unknown error';\n}\n\nreturn [{\n  json: {\n    channel: 'C0A1RFH7VL4',\n    text: `❌ *HYCU 수강 출석 실패*\\n오류: ${errorMsg}\\n\\n초기 시도 및 재시도 모두 실패했습니다.`\n  }\n}];"
+      }
+    },
+    {
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "name": "Slack Notify",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Oq6RplVhTJ3Rr96J",
+          "name": "Slack Bot Token"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "options": {},
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "jsonBody": "={{ JSON.stringify({ channel: $json.channel, text: $json.text, unfurl_links: false }) }}",
+        "authentication": "genericCredentialType",
+        "specifyBody": "json",
+        "url": "https://slack.com/api/chat.postMessage",
+        "sendHeaders": false
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "position": [
+        1790,
+        400
+      ],
+      "id": "slack-notify",
+      "maxTries": 3
+    },
+    {
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "verify-slack",
+      "name": "Verify Slack",
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (r.ok !== true) {\n  throw new Error(`Slack API error: ${r.error || 'unknown'}`);\n}\nreturn [{ json: r }];"
+      },
+      "position": [
+        2010,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Run Attendance": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Check Result"
+          }
+        ]
+      ]
+    },
+    "Weekday 17:00 KST": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Run Attendance"
+          }
+        ]
+      ]
+    },
+    "Format Success": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Slack Notify",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Result": {
+      "main": [
+        [
+          {
+            "node": "Format Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 60s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Failure": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Retry OK": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Slack Notify"
+          }
+        ]
+      ]
+    },
+    "Check Retry": {
+      "main": [
+        [
+          {
+            "node": "Format Retry OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Format Failure",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Slack Notify": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Verify Slack",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Wait 60s": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Retry Attendance",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Retry Attendance": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Retry",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionTimeout": 3600,
+    "timezone": "UTC",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Weekday 17:00 KST": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "e1de787e-75b6-41cf-9fca-07d17b3d739d",
+  "createdAt": "2026-03-13T00:04:06.979Z",
+  "updatedAt": "2026-03-13T00:37:54.564Z"
+}

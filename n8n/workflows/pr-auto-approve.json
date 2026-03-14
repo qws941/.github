@@ -1,0 +1,279 @@
+{
+  "id": "fhSX1Kl6iwIAayr0",
+  "name": "PR Auto-Approve",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "webhookId": "d9a5b3c4-6e7f-8a9b-0c1d-2e3f4a5b6c7d",
+      "id": "webhook-pr",
+      "name": "GitHub PR Webhook",
+      "parameters": {
+        "responseMode": "onReceived",
+        "httpMethod": "POST",
+        "options": {},
+        "path": "pr-auto-approve"
+      },
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "id": "check-pr-action",
+      "name": "Is PR Opened or Synced",
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "rightValue": "opened",
+              "id": "cond1",
+              "leftValue": "={{ $json.body.action }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              }
+            },
+            {
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "synchronize",
+              "id": "cond2",
+              "leftValue": "={{ $json.body.action }}"
+            },
+            {
+              "id": "cond3",
+              "leftValue": "={{ $json.body.action }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "reopened"
+            }
+          ],
+          "options": {
+            "caseSensitive": false
+          }
+        }
+      },
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "id": "check-pr-author",
+      "name": "Is Trusted Author",
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.body.pull_request.user.login }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "dependabot[bot]"
+            },
+            {
+              "id": "cond2",
+              "leftValue": "={{ $json.body.pull_request.user.login }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "github-actions[bot]"
+            },
+            {
+              "leftValue": "={{ $json.body.pull_request.user.login }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "chatgpt-codex-connector[bot]",
+              "id": "cond3"
+            },
+            {
+              "rightValue": "openai-code-agent[bot]",
+              "id": "cond4",
+              "leftValue": "={{ $json.body.pull_request.user.login }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              }
+            },
+            {
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "codex[bot]",
+              "id": "cond5",
+              "leftValue": "={{ $json.body.pull_request.user.login }}"
+            },
+            {
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "Codex",
+              "id": "cond6",
+              "leftValue": "={{ $json.body.pull_request.user.login }}"
+            }
+          ],
+          "options": {
+            "caseSensitive": false
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        750,
+        250
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "position": [
+        1000,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "id": "approve-pr",
+      "name": "Approve PR",
+      "parameters": {
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "=https://api.github.com/repos/{{ $json.body.repository.full_name }}/pulls/{{ $json.body.pull_request.number }}/reviews",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GITHUB_PAT }}"
+            },
+            {
+              "value": "application/vnd.github+json",
+              "name": "Accept"
+            },
+            {
+              "value": "2022-11-28",
+              "name": "X-GitHub-Api-Version"
+            }
+          ]
+        },
+        "jsonBody": "={\"event\": \"APPROVE\", \"body\": \"Auto-approved: trusted actor\"}",
+        "method": "POST",
+        "options": {}
+      }
+    },
+    {
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "id": "enable-automerge",
+      "name": "Enable Auto-Merge",
+      "parameters": {
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://api.github.com/graphql",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GITHUB_PAT }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "jsonBody": "={\n  \"query\": \"mutation { enablePullRequestAutoMerge(input: { pullRequestId: \\\"{{ $json.body.pull_request.node_id }}\\\", mergeMethod: SQUASH }) { pullRequest { autoMergeRequest { enabledAt } } } }\"\n}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true
+      },
+      "position": [
+        1250,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Is Trusted Author": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Approve PR",
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    },
+    "Approve PR": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Enable Auto-Merge",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "GitHub PR Webhook": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Is PR Opened or Synced"
+          }
+        ]
+      ]
+    },
+    "Is PR Opened or Synced": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Is Trusted Author",
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionTimeout": 3600,
+    "timezone": "UTC",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "2c06378a-9406-476e-8533-054abdf55549",
+  "createdAt": "2026-03-12T17:12:25.501Z",
+  "updatedAt": "2026-03-12T17:12:25.501Z"
+}

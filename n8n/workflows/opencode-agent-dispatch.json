@@ -1,0 +1,115 @@
+{
+  "id": "37yXgGz5I8z32Pwd",
+  "name": "opencode-agent-dispatch",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "opencode-agent/dispatch",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "id": "dispatch-webhook",
+      "name": "Receive Dispatch Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst prompt = body.prompt;\nconst repo = body.repo;\nconst model = body.model || 'openai/gpt-5.4';\nconst mode = body.mode || 'run';\nconst idempotency_key = body.idempotency_key;\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst { randomUUID } = require('crypto');\nconst job_id = randomUUID();\n\nconst gateway_request = {\n  job_id,\n  prompt,\n  repo,\n  model,\n  mode,\n  callback_url: 'https://n8n.jclee.me/webhook/opencode-agent/callback',\n  idempotency_key: idempotency_key || job_id,\n};\n\nreturn {\n  job_id,\n  gateway_request,\n};"
+      },
+      "id": "validate-build-job",
+      "name": "Validate & Build Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.50.108:7800/jobs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.gateway_request) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-gateway",
+      "name": "Send to Gateway",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'dispatched', job_id: $('Validate & Build Job').first().json.job_id, gateway_response: $json } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "respond-accepted",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Dispatch Request": {
+      "main": [
+        [
+          {
+            "node": "Validate & Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Build Job": {
+      "main": [
+        [
+          {
+            "node": "Send to Gateway",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Gateway": {
+      "main": [
+        [
+          {
+            "node": "Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionTimeout": 30,
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Asia/Seoul"
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "id": "KsyebDRnuQcjsMY8",
+  "name": "YouTube Pipeline Trigger",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pipeline/trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -200
+      ],
+      "webhookId": "pipeline-trigger"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 1,3,5"
+            }
+          ]
+        }
+      },
+      "id": "schedule-horror",
+      "name": "Schedule Horror (Mon/Wed/Fri 6PM KST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 2,4,6"
+            }
+          ]
+        }
+      },
+      "id": "schedule-facts",
+      "name": "Schedule Facts (Tue/Thu/Sat 6PM KST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-finance",
+      "name": "Schedule Finance (Daily 9AM KST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const triggerData = $input.first().json;\nif (!$vars.DEFAULT_AGENT) throw new Error('n8n Variable DEFAULT_AGENT is not set.');\nif (!$vars.DEFAULT_CHANNEL) throw new Error('n8n Variable DEFAULT_CHANNEL is not set.');\nconst DEFAULT_AGENT = $vars.DEFAULT_AGENT;\nconst DEFAULT_CHANNEL = $vars.DEFAULT_CHANNEL;\n\nlet channel = triggerData.body?.channel || triggerData.channel;\nconst topic = triggerData.body?.topic || triggerData.topic || null;\nconst autoUpload = triggerData.body?.auto_upload ?? triggerData.auto_upload ?? true;\nconst dryRun = triggerData.body?.dry_run ?? triggerData.dry_run ?? false;\nconst agent = triggerData.body?.opencode_agent || triggerData.opencode_agent || DEFAULT_AGENT;\nconst model = triggerData.body?.opencode_model || triggerData.opencode_model || null;\nconst runwayGatewayUrl = triggerData.body?.runway_gateway_url || triggerData.runway_gateway_url || null;\nconst runwayGatewayAuthToken = triggerData.body?.runway_gateway_auth_token || triggerData.runway_gateway_auth_token || null;\n\nif (!channel) {\n  try { $('Schedule Horror (Mon/Wed/Fri 6PM KST)').first(); channel = 'horror'; } catch(e) {}\n  if (!channel) try { $('Schedule Facts (Tue/Thu/Sat 6PM KST)').first(); channel = 'facts'; } catch(e) {}\n  if (!channel) try { $('Schedule Finance (Daily 9AM KST)').first(); channel = 'finance'; } catch(e) {}\n  if (!channel) channel = DEFAULT_CHANNEL;\n}\n\nconst params = {\n  channel,\n  auto_upload: autoUpload,\n  dry_run: dryRun,\n  opencode_agent: agent,\n};\nif (topic) {\n  params.topic = topic;\n  params.topic_override = { title: topic, topic: topic, hook: 'n8n trigger' };\n}\nif (model) params.opencode_model = model;\nif (runwayGatewayUrl) params.runway_gateway_url = String(runwayGatewayUrl).trim();\nif (runwayGatewayAuthToken) params.runway_gateway_auth_token = String(runwayGatewayAuthToken).trim();\n\nreturn {\n  command: dryRun ? 'run_dry' : 'run_pipeline',\n  channel,\n  params,\n  isWebhook: !!triggerData.body,\n  triggeredAt: new Date().toISOString(),\n};"
+      },
+      "id": "normalize-input",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "kWW5947tHQ8RqMFi"
+      },
+      "id": "execute-queue",
+      "name": "Execute Pipeline Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        700,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "webhook-check",
+              "leftValue": "={{ $json.isWebhook }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-webhook",
+      "name": "Is Webhook?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        950,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": {{ $json.isSuccess }},\n  \"commandId\": \"{{ $json.commandId }}\",\n  \"status\": \"{{ $json.status }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"youtubeId\": {{ $json.youtubeId ? '\"' + $json.youtubeId + '\"' : 'null' }}\n}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Horror (Mon/Wed/Fri 6PM KST)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Facts (Tue/Thu/Sat 6PM KST)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Finance (Daily 9AM KST)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Pipeline Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Webhook?": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Execute Pipeline Workflow": {
+      "main": [
+        [
+          {
+            "node": "Is Webhook?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "Asia/Seoul",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Horror (Mon/Wed/Fri 6PM KST)": {
+      "recurrenceRules": []
+    },
+    "node:Schedule Facts (Tue/Thu/Sat 6PM KST)": {
+      "recurrenceRules": []
+    },
+    "node:Schedule Finance (Daily 9AM KST)": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "d5405258-8ac5-47df-916e-ecd87b5bae79",
+  "createdAt": "2026-03-12T17:22:33.233Z",
+  "updatedAt": "2026-03-13T07:28:29.085Z"
+}

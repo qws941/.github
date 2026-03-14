@@ -1,0 +1,109 @@
+{
+  "id": "PV5yLgHNzNSlCmRT",
+  "name": "Slack Notifier",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "slack-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit payload from input\nconst input = $input.first().json;\n\nconst isSuccess = !!input.isSuccess;\nconst status = input.status || 'unknown';\nconst channel = input.channel || 'unknown';\nconst command = input.command || 'N/A';\nconst duration = input.duration ? `${input.duration}s` : 'N/A';\nconst youtubeId = input.youtubeId || null;\nconst errorMessage = input.errorMessage || null;\nconst source = input.source || 'pipeline';\nconst outputUrl = input.outputUrl || null;\nconst timedOut = !!input.timedOut;\nconst pollCount = input.pollCount || null;\n\nconst capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';\n\n// Status emoji\nconst emoji = isSuccess ? '✅' : timedOut ? '⏰' : '❌';\nconst statusLabel = timedOut ? 'Timed Out' : capitalize(status);\n\n// Header\nconst headerText = `${emoji} ${capitalize(source)} ${statusLabel} — ${capitalize(channel)}`;\n\n// Fields\nconst fields = [\n  { type: 'mrkdwn', text: `*Channel:*\\n${channel}` },\n  { type: 'mrkdwn', text: `*Command:*\\n${command}` },\n  { type: 'mrkdwn', text: `*Duration:*\\n${duration}` },\n  { type: 'mrkdwn', text: `*Source:*\\n${source}` }\n];\n\nif (youtubeId) {\n  fields.push({ type: 'mrkdwn', text: `*YouTube ID:*\\n${youtubeId}` });\n}\nif (outputUrl) {\n  fields.push({ type: 'mrkdwn', text: `*Output:*\\n${outputUrl}` });\n}\nif (pollCount) {\n  fields.push({ type: 'mrkdwn', text: `*Polls:*\\n${pollCount}` });\n}\n\nconst blocks = [\n  {\n    type: 'header',\n    text: { type: 'plain_text', text: headerText }\n  },\n  {\n    type: 'section',\n    fields: fields\n  }\n];\n\n// Add error context block if failed\nif (!isSuccess && errorMessage) {\n  blocks.push({\n    type: 'section',\n    text: { type: 'mrkdwn', text: `*Error:*\\n\\`\\`\\`${errorMessage.substring(0, 500)}\\`\\`\\`` }\n  });\n}\n\nreturn {\n  text: `${emoji} ${capitalize(source)} ${statusLabel} — ${capitalize(channel)}`,\n  blocks: blocks\n};"
+      },
+      "id": "build-payload",
+      "name": "Build Slack Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "slack-post",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return notification result back to calling workflow\nconst trigger = $('Execute Workflow Trigger').first().json;\nreturn {\n  notified: true,\n  channel: trigger.channel || 'unknown'\n};"
+      },
+      "id": "return-result",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Payload": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Slack": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "9bfb34fe-f77a-49de-b35f-4113cfbdb77c",
+  "createdAt": "2026-03-12T17:23:55.254Z",
+  "updatedAt": "2026-03-12T17:23:55.254Z"
+}
