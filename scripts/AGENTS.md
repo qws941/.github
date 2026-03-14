@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-`scripts/` holds the repo's executable source code: six Go CLIs for repo onboarding, label synchronization, git-flow automation, action pin auditing, sync preview, and CODEOWNERS validation, plus the label SSoT data file, test files, and a shared retry package.
+`scripts/` holds the repo's executable source code: seven Go CLIs for repo onboarding, label synchronization, git-flow automation, action pin auditing, sync preview, CODEOWNERS validation, and label-reference validation, plus the label SSoT data file, test files, and a shared retry package.
 
 ## STRUCTURE
 
@@ -16,13 +16,14 @@ scripts/
 │   └── retry/                # shared retry-with-backoff package
 │       ├── retry.go
 │       └── retry_test.go
-├── labels.yml                # 27 standard labels shared across downstream repos
+├── labels.yml                # 32 standard labels shared across downstream repos
 ├── onboard-repo.go           # repo onboarding CLI
 ├── onboard-repo_test.go      # tests for onboard-repo (build tag: onboard_repo)
 ├── preview-sync.go           # sync diff preview CLI
 ├── sync-labels.go            # label sync CLI with worker pool
 ├── sync-labels_test.go       # tests for sync-labels (build tag: sync_labels)
-└── validate-codeowners.go    # CODEOWNERS validation CLI with worker pool
+├── validate-codeowners.go    # CODEOWNERS validation CLI with worker pool
+└── validate-labels.go        # label-reference validation CLI (SSoT drift prevention)
 ```
 
 ## WHERE TO LOOK
@@ -35,6 +36,7 @@ scripts/
 | Audit action SHA pins | `scripts/audit-action-pins.go` | Scans downstream workflows for unpinned actions, opens issues |
 | Preview sync changes | `scripts/preview-sync.go` | Compares local files with downstream versions, shows diffs |
 | Validate CODEOWNERS | `scripts/validate-codeowners.go` | Checks CODEOWNERS across downstream repos for format and path issues |
+| Validate label references | `scripts/validate-labels.go` | Ensures workflow label refs match `labels.yml` SSoT; CI-integrated |
 | Automate git-flow lifecycle | `scripts/git-flow.go` | Branch creation, PR, merge, sync, status — supports `--dry-run` |
 | Change retry behavior | `scripts/internal/retry/retry.go` | Shared exponential-backoff retry used by CLIs |
 | Change verification output | `scripts/sync-labels.go` `printSummary`, `scripts/onboard-repo.go` `stepVerify` | Human-readable operator output |
@@ -64,6 +66,7 @@ scripts/
 | `main` | `scripts/audit-action-pins.go` | Scans downstream workflows for unpinned/outdated action SHA pins |
 | `main` | `scripts/preview-sync.go` | Previews sync diffs between local and downstream file versions |
 | `main` | `scripts/validate-codeowners.go` | Validates CODEOWNERS format and paths across downstream repos |
+| `main` | `scripts/validate-labels.go` | Validates workflow label references against `labels.yml` SSoT |
 
 ## CONVENTIONS
 
@@ -74,7 +77,7 @@ scripts/
 - `git-flow.go` automates the trunk-based development lifecycle: branch creation → PR → merge → cleanup.
 - `git-flow.go` finish gates: PR must be open, not draft, mergeable, and all CI checks passed (pending checks block merge).
 - Test files use build tags (`//go:build onboard_repo`, `//go:build sync_labels`) to isolate per-CLI tests.
-- `audit-action-pins.go` and `validate-codeowners.go` use `//go:build ignore` since they are run directly via `go run`.
+- `audit-action-pins.go`, `validate-codeowners.go`, and `validate-labels.go` use `//go:build ignore` since they are run directly via `go run`.
 
 ## ANTI-PATTERNS (THIS SUBTREE)
 
@@ -99,4 +102,5 @@ go run scripts/git-flow.go sync --dry-run
 go run scripts/audit-action-pins.go
 go run scripts/preview-sync.go
 go run scripts/validate-codeowners.go
+go run scripts/validate-labels.go --verbose
 ```

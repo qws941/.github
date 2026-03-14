@@ -1,0 +1,42 @@
+name: Validate Labels
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'scripts/labels.yml'
+      - '.github/workflows/_*.yml'
+      - 'scripts/validate-labels.go'
+  pull_request:
+    paths:
+      - 'scripts/labels.yml'
+      - '.github/workflows/_*.yml'
+      - 'scripts/validate-labels.go'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-labels-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: '1.22'
+
+      - name: Validate label references
+        run: go run scripts/validate-labels.go --verbose

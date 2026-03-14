@@ -52,6 +52,7 @@ GitHub community-health and automation SSoT for `qws941` repositories. This repo
 | `main` | function | `scripts/git-flow.go` | Dispatches start/pr/finish/status/sync git-flow subcommands |
 | `cmdFinish` | function | `scripts/git-flow.go` | Squash-merges PR after CI, draft, and mergeable gates pass |
 | `resolveCheckConclusion` | function | `scripts/git-flow.go` | Normalizes CI check status across CheckRun and StatusContext objects |
+| `main` | function | `scripts/validate-labels.go` | Validates workflow label references against `labels.yml` SSoT |
 
 ## CONVENTIONS
 
@@ -87,6 +88,7 @@ go run scripts/git-flow.go start --dry-run feat/my-feature
 go run scripts/git-flow.go pr --dry-run
 go run scripts/git-flow.go finish --dry-run
 go run scripts/git-flow.go sync --dry-run
+go run scripts/validate-labels.go --verbose
 ```
 
 ## NOTES
