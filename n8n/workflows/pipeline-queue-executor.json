@@ -1,352 +1,729 @@
 {
-  "id": "kRRZAx7krkcaCcpT",
-  "name": "pipeline-queue-executor",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "parameters": {},
-      "id": "execute-workflow-trigger",
-      "name": "Execute Workflow Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
-      "position": [
-        100,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
+    "updatedAt": "2026-03-12T17:23:56.424Z",
+    "createdAt": "2026-03-12T17:23:56.424Z",
+    "id": "kRRZAx7krkcaCcpT",
+    "name": "pipeline-queue-executor",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "execute-workflow-trigger",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                100
+            ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"command\": \"{{ $json.command }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"params\": {{ JSON.stringify($json.params) }},\n  \"created_by\": \"n8n\"\n}"
-      },
-      "id": "insert-command",
-      "name": "Insert Pipeline Command",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        400,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Config from n8n variables (Settings → Variables) — fail-fast if not set\nif (!$vars.MAX_POLLS) throw new Error('n8n Variable MAX_POLLS is not set. Configure in Settings → Variables.');\nif (!$vars.POLL_INTERVAL_SECONDS) throw new Error('n8n Variable POLL_INTERVAL_SECONDS is not set. Configure in Settings → Variables.');\nconst MAX_POLLS = Number($vars.MAX_POLLS);\nif (isNaN(MAX_POLLS) || MAX_POLLS <= 0) throw new Error('n8n Variable MAX_POLLS must be a positive number.');\nconst pollInterval = Number($vars.POLL_INTERVAL_SECONDS);\nif (isNaN(pollInterval) || pollInterval <= 0) throw new Error('n8n Variable POLL_INTERVAL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\nconst commandData = Array.isArray(response) ? response[0] : response;\n\nreturn {\n  commandId: commandData.id,\n  command: commandData.command,\n  channel: commandData.channel,\n  status: commandData.status,\n  isWebhook: $('Execute Workflow Trigger').first().json.isWebhook,\n  triggeredAt: $('Execute Workflow Trigger').first().json.triggeredAt,\n  pollCount: 0,\n  maxPolls: MAX_POLLS\n};"
-      },
-      "id": "parse-insert",
-      "name": "Parse Insert Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        700,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "amount": "={{ Number($vars.POLL_INTERVAL_SECONDS) }}",
-        "unit": "seconds"
-      },
-      "id": "wait-poll",
-      "name": "Poll Interval Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        1000,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "return=representation"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"command\": \"{{ $json.command }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"params\": {{ JSON.stringify($json.params) }},\n  \"created_by\": \"n8n\"\n}"
             },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
-          ]
+            "id": "insert-command",
+            "name": "Insert Pipeline Command",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                400,
+                100
+            ]
         },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
+        {
+            "parameters": {
+                "jsCode": "// Config from n8n variables (Settings \u2192 Variables) \u2014 fail-fast if not set\nif (!$vars.MAX_POLLS) throw new Error('n8n Variable MAX_POLLS is not set. Configure in Settings \u2192 Variables.');\nif (!$vars.POLL_INTERVAL_SECONDS) throw new Error('n8n Variable POLL_INTERVAL_SECONDS is not set. Configure in Settings \u2192 Variables.');\nconst MAX_POLLS = Number($vars.MAX_POLLS);\nif (isNaN(MAX_POLLS) || MAX_POLLS <= 0) throw new Error('n8n Variable MAX_POLLS must be a positive number.');\nconst pollInterval = Number($vars.POLL_INTERVAL_SECONDS);\nif (isNaN(pollInterval) || pollInterval <= 0) throw new Error('n8n Variable POLL_INTERVAL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\nconst commandData = Array.isArray(response) ? response[0] : response;\n\nreturn {\n  commandId: commandData.id,\n  command: commandData.command,\n  channel: commandData.channel,\n  status: commandData.status,\n  isWebhook: $('Execute Workflow Trigger').first().json.isWebhook,\n  triggeredAt: $('Execute Workflow Trigger').first().json.triggeredAt,\n  pollCount: 0,\n  maxPolls: MAX_POLLS\n};"
+            },
+            "id": "parse-insert",
+            "name": "Parse Insert Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                700,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ Number($vars.POLL_INTERVAL_SECONDS) }}",
+                "unit": "seconds"
+            },
+            "id": "wait-poll",
+            "name": "Poll Interval Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1000,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        }
+                    ]
+                },
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "value": "=eq.{{ $('Parse Insert Result').first().json.commandId }}"
+                        },
+                        {
+                            "name": "select",
+                            "value": "*"
+                        }
+                    ]
+                }
+            },
+            "id": "check-status",
+            "name": "Check Command Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1300,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = $input.first().json;\nconst command = Array.isArray(response) ? response[0] : response;\n\n// Get loop state \u2014 Continue Polling carries updated pollCount on subsequent iterations\nlet prevData;\ntry {\n  prevData = $('Continue Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Insert Result').first().json;\n}\n\nconst status = command.status;\nconst isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  commandId: prevData.commandId,\n  command: command.command,\n  channel: command.channel,\n  status: status,\n  result: command.result,\n  errorMessage: command.error_message,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  currentStage: command.result?.current_stage || null,\n  youtubeId: command.result?.youtube_id || null,\n  outputPath: command.result?.output_path || null,\n  duration: command.started_at && command.completed_at\n    ? Math.round((new Date(command.completed_at) - new Date(command.started_at)) / 1000)\n    : null\n};"
+            },
+            "id": "evaluate-status",
+            "name": "Evaluate Status",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1600,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "terminal-check",
+                            "leftValue": "={{ $json.isTerminal }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "if-terminal",
+            "name": "Is Terminal?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.1,
+            "position": [
+                1900,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Map queue executor data to Slack Notifier input format\nconst data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline'\n};"
+            },
+            "id": "prepare-slack",
+            "name": "Prepare Slack Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2200,
+                -100
+            ]
+        },
+        {
+            "parameters": {
+                "source": "database",
+                "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+            },
+            "id": "call-slack-notifier",
+            "name": "Notify via Slack",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.1,
+            "position": [
+                2200,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "return $('Evaluate Status').first().json;"
+            },
+            "id": "return-result",
+            "name": "Return Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2500,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  commandId: prevData.commandId,\n  command: prevData.command,\n  channel: prevData.channel,\n  status: prevData.status,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
+            },
+            "id": "loop-continue",
+            "name": "Continue Polling",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2200,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Execute Workflow Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Insert Pipeline Command",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Insert Pipeline Command": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Insert Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Insert Result": {
+            "main": [
+                [
+                    {
+                        "node": "Poll Interval Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Poll Interval Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Check Command Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Command Status": {
+            "main": [
+                [
+                    {
+                        "node": "Evaluate Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evaluate Status": {
+            "main": [
+                [
+                    {
+                        "node": "Is Terminal?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Terminal?": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Slack Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Continue Polling",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Slack Input": {
+            "main": [
+                [
+                    {
+                        "node": "Notify via Slack",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify via Slack": {
+            "main": [
+                [
+                    {
+                        "node": "Return Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Continue Polling": {
+            "main": [
+                [
+                    {
+                        "node": "Poll Interval Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "da0ece9d-7659-4778-9002-7d4580f84ff3",
+    "activeVersionId": "da0ece9d-7659-4778-9002-7d4580f84ff3",
+    "versionCounter": 6,
+    "triggerCount": 0,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T17:23:56.424Z",
+            "createdAt": "2026-03-12T17:23:56.424Z",
+            "role": "workflow:owner",
+            "workflowId": "kRRZAx7krkcaCcpT",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-12T17:23:56.426Z",
+        "createdAt": "2026-03-12T17:23:56.426Z",
+        "versionId": "da0ece9d-7659-4778-9002-7d4580f84ff3",
+        "workflowId": "kRRZAx7krkcaCcpT",
+        "nodes": [
             {
-              "name": "id",
-              "value": "=eq.{{ $('Parse Insert Result').first().json.commandId }}"
+                "parameters": {},
+                "id": "execute-workflow-trigger",
+                "name": "Execute Workflow Trigger",
+                "type": "n8n-nodes-base.executeWorkflowTrigger",
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    100
+                ]
             },
             {
-              "name": "select",
-              "value": "*"
-            }
-          ]
-        }
-      },
-      "id": "check-status",
-      "name": "Check Command Status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1300,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const response = $input.first().json;\nconst command = Array.isArray(response) ? response[0] : response;\n\n// Get loop state — Continue Polling carries updated pollCount on subsequent iterations\nlet prevData;\ntry {\n  prevData = $('Continue Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Insert Result').first().json;\n}\n\nconst status = command.status;\nconst isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  commandId: prevData.commandId,\n  command: command.command,\n  channel: command.channel,\n  status: status,\n  result: command.result,\n  errorMessage: command.error_message,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  currentStage: command.result?.current_stage || null,\n  youtubeId: command.result?.youtube_id || null,\n  outputPath: command.result?.output_path || null,\n  duration: command.started_at && command.completed_at\n    ? Math.round((new Date(command.completed_at) - new Date(command.started_at)) / 1000)\n    : null\n};"
-      },
-      "id": "evaluate-status",
-      "name": "Evaluate Status",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
+                "parameters": {
+                    "method": "POST",
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "name": "Prefer",
+                                "value": "return=representation"
+                            }
+                        ]
+                    },
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={\n  \"command\": \"{{ $json.command }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"params\": {{ JSON.stringify($json.params) }},\n  \"created_by\": \"n8n\"\n}"
+                },
+                "id": "insert-command",
+                "name": "Insert Pipeline Command",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    400,
+                    100
+                ]
+            },
             {
-              "id": "terminal-check",
-              "leftValue": "={{ $json.isTerminal }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+                "parameters": {
+                    "jsCode": "// Config from n8n variables (Settings \u2192 Variables) \u2014 fail-fast if not set\nif (!$vars.MAX_POLLS) throw new Error('n8n Variable MAX_POLLS is not set. Configure in Settings \u2192 Variables.');\nif (!$vars.POLL_INTERVAL_SECONDS) throw new Error('n8n Variable POLL_INTERVAL_SECONDS is not set. Configure in Settings \u2192 Variables.');\nconst MAX_POLLS = Number($vars.MAX_POLLS);\nif (isNaN(MAX_POLLS) || MAX_POLLS <= 0) throw new Error('n8n Variable MAX_POLLS must be a positive number.');\nconst pollInterval = Number($vars.POLL_INTERVAL_SECONDS);\nif (isNaN(pollInterval) || pollInterval <= 0) throw new Error('n8n Variable POLL_INTERVAL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\nconst commandData = Array.isArray(response) ? response[0] : response;\n\nreturn {\n  commandId: commandData.id,\n  command: commandData.command,\n  channel: commandData.channel,\n  status: commandData.status,\n  isWebhook: $('Execute Workflow Trigger').first().json.isWebhook,\n  triggeredAt: $('Execute Workflow Trigger').first().json.triggeredAt,\n  pollCount: 0,\n  maxPolls: MAX_POLLS\n};"
+                },
+                "id": "parse-insert",
+                "name": "Parse Insert Result",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    700,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "amount": "={{ Number($vars.POLL_INTERVAL_SECONDS) }}",
+                    "unit": "seconds"
+                },
+                "id": "wait-poll",
+                "name": "Poll Interval Wait",
+                "type": "n8n-nodes-base.wait",
+                "typeVersion": 1.1,
+                "position": [
+                    1000,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "GET",
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            }
+                        ]
+                    },
+                    "sendQuery": true,
+                    "queryParameters": {
+                        "parameters": [
+                            {
+                                "name": "id",
+                                "value": "=eq.{{ $('Parse Insert Result').first().json.commandId }}"
+                            },
+                            {
+                                "name": "select",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                },
+                "id": "check-status",
+                "name": "Check Command Status",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1300,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "const response = $input.first().json;\nconst command = Array.isArray(response) ? response[0] : response;\n\n// Get loop state \u2014 Continue Polling carries updated pollCount on subsequent iterations\nlet prevData;\ntry {\n  prevData = $('Continue Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Insert Result').first().json;\n}\n\nconst status = command.status;\nconst isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  commandId: prevData.commandId,\n  command: command.command,\n  channel: command.channel,\n  status: status,\n  result: command.result,\n  errorMessage: command.error_message,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  currentStage: command.result?.current_stage || null,\n  youtubeId: command.result?.youtube_id || null,\n  outputPath: command.result?.output_path || null,\n  duration: command.started_at && command.completed_at\n    ? Math.round((new Date(command.completed_at) - new Date(command.started_at)) / 1000)\n    : null\n};"
+                },
+                "id": "evaluate-status",
+                "name": "Evaluate Status",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1600,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict"
+                        },
+                        "conditions": [
+                            {
+                                "id": "terminal-check",
+                                "leftValue": "={{ $json.isTerminal }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "type": "boolean",
+                                    "operation": "equals"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    }
+                },
+                "id": "if-terminal",
+                "name": "Is Terminal?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2.1,
+                "position": [
+                    1900,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Map queue executor data to Slack Notifier input format\nconst data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline'\n};"
+                },
+                "id": "prepare-slack",
+                "name": "Prepare Slack Input",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2200,
+                    -100
+                ]
+            },
+            {
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+                },
+                "id": "call-slack-notifier",
+                "name": "Notify via Slack",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1.1,
+                "position": [
+                    2200,
+                    0
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "return $('Evaluate Status').first().json;"
+                },
+                "id": "return-result",
+                "name": "Return Result",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2500,
+                    0
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  commandId: prevData.commandId,\n  command: prevData.command,\n  channel: prevData.channel,\n  status: prevData.status,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
+                },
+                "id": "loop-continue",
+                "name": "Continue Polling",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2200,
+                    300
+                ]
             }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "if-terminal",
-      "name": "Is Terminal?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.1,
-      "position": [
-        1900,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Map queue executor data to Slack Notifier input format\nconst data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline'\n};"
-      },
-      "id": "prepare-slack",
-      "name": "Prepare Slack Input",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2200,
-        -100
-      ]
-    },
-    {
-      "parameters": {
-        "source": "database",
-        "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
-      },
-      "id": "call-slack-notifier",
-      "name": "Notify via Slack",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.1,
-      "position": [
-        2200,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "return $('Evaluate Status').first().json;"
-      },
-      "id": "return-result",
-      "name": "Return Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2500,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  commandId: prevData.commandId,\n  command: prevData.command,\n  channel: prevData.channel,\n  status: prevData.status,\n  isWebhook: prevData.isWebhook,\n  triggeredAt: prevData.triggeredAt,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
-      },
-      "id": "loop-continue",
-      "name": "Continue Polling",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2200,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Execute Workflow Trigger": {
-      "main": [
-        [
-          {
-            "node": "Insert Pipeline Command",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert Pipeline Command": {
-      "main": [
-        [
-          {
-            "node": "Parse Insert Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Insert Result": {
-      "main": [
-        [
-          {
-            "node": "Poll Interval Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Poll Interval Wait": {
-      "main": [
-        [
-          {
-            "node": "Check Command Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Command Status": {
-      "main": [
-        [
-          {
-            "node": "Evaluate Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Evaluate Status": {
-      "main": [
-        [
-          {
-            "node": "Is Terminal?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Is Terminal?": {
-      "main": [
-        [
-          {
-            "node": "Prepare Slack Input",
-            "type": "main",
-            "index": 0
-          }
         ],
-        [
-          {
-            "node": "Continue Polling",
-            "type": "main",
-            "index": 0
-          }
+        "connections": {
+            "Execute Workflow Trigger": {
+                "main": [
+                    [
+                        {
+                            "node": "Insert Pipeline Command",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Insert Pipeline Command": {
+                "main": [
+                    [
+                        {
+                            "node": "Parse Insert Result",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Parse Insert Result": {
+                "main": [
+                    [
+                        {
+                            "node": "Poll Interval Wait",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Poll Interval Wait": {
+                "main": [
+                    [
+                        {
+                            "node": "Check Command Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Check Command Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Evaluate Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Evaluate Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Is Terminal?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Is Terminal?": {
+                "main": [
+                    [
+                        {
+                            "node": "Prepare Slack Input",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Continue Polling",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Slack Input": {
+                "main": [
+                    [
+                        {
+                            "node": "Notify via Slack",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Notify via Slack": {
+                "main": [
+                    [
+                        {
+                            "node": "Return Result",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Continue Polling": {
+                "main": [
+                    [
+                        {
+                            "node": "Poll Interval Wait",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "JC Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-12T17:23:57.298Z",
+                "id": 8,
+                "workflowId": "kRRZAx7krkcaCcpT",
+                "versionId": "da0ece9d-7659-4778-9002-7d4580f84ff3",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
-    },
-    "Prepare Slack Input": {
-      "main": [
-        [
-          {
-            "node": "Notify via Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify via Slack": {
-      "main": [
-        [
-          {
-            "node": "Return Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Continue Polling": {
-      "main": [
-        [
-          {
-            "node": "Poll Interval Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
-  },
-  "settings": {
-    "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": null,
-  "meta": null,
-  "pinData": null,
-  "versionId": "da0ece9d-7659-4778-9002-7d4580f84ff3",
-  "createdAt": "2026-03-12T17:23:56.424Z",
-  "updatedAt": "2026-03-12T17:23:56.424Z"
 }

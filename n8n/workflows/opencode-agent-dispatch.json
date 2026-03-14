@@ -1,115 +1,274 @@
 {
-  "id": "37yXgGz5I8z32Pwd",
-  "name": "opencode-agent-dispatch",
-  "active": false,
-  "nodes": [
-    {
-      "parameters": {
-        "path": "opencode-agent/dispatch",
-        "httpMethod": "POST",
-        "responseMode": "responseNode"
-      },
-      "id": "dispatch-webhook",
-      "name": "Receive Dispatch Request",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst prompt = body.prompt;\nconst repo = body.repo;\nconst model = body.model || 'openai/gpt-5.4';\nconst mode = body.mode || 'run';\nconst idempotency_key = body.idempotency_key;\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst { randomUUID } = require('crypto');\nconst job_id = randomUUID();\n\nconst gateway_request = {\n  job_id,\n  prompt,\n  repo,\n  model,\n  mode,\n  callback_url: 'https://n8n.jclee.me/webhook/opencode-agent/callback',\n  idempotency_key: idempotency_key || job_id,\n};\n\nreturn {\n  job_id,\n  gateway_request,\n};"
-      },
-      "id": "validate-build-job",
-      "name": "Validate & Build Job",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        480,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://192.168.50.108:7800/jobs",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.gateway_request) }}",
-        "options": {
-          "timeout": 10000
+    "updatedAt": "2026-03-14T12:23:14.905Z",
+    "createdAt": "2026-03-14T11:52:36.573Z",
+    "id": "37yXgGz5I8z32Pwd",
+    "name": "opencode-agent-dispatch",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "path": "opencode-agent/dispatch",
+                "httpMethod": "POST",
+                "responseMode": "responseNode"
+            },
+            "id": "dispatch-webhook",
+            "name": "Receive Dispatch Request",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                220,
+                300
+            ],
+            "webhookId": "584f444f"
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst prompt = body.prompt;\nconst repo = body.repo;\nconst model = body.model || 'openai/gpt-5.4';\nconst mode = body.mode || 'run';\nconst idempotency_key = body.idempotency_key;\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst { randomUUID } = require('crypto');\nconst job_id = randomUUID();\n\nconst gateway_request = {\n  job_id,\n  prompt,\n  repo,\n  model,\n  mode,\n  callback_url: 'https://n8n.jclee.me/webhook/opencode-agent/callback',\n  idempotency_key: idempotency_key || job_id,\n};\n\nreturn {\n  job_id,\n  gateway_request,\n};"
+            },
+            "id": "validate-build-job",
+            "name": "Validate & Build Job",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.50.108:7800/jobs",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.gateway_request) }}",
+                "options": {
+                    "timeout": 10000
+                }
+            },
+            "id": "send-gateway",
+            "name": "Send to Gateway",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                760,
+                300
+            ],
+            "continueOnFail": true
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ { status: 'dispatched', job_id: $('Validate & Build Job').first().json.job_id, gateway_response: $json } }}",
+                "options": {
+                    "responseCode": 202
+                }
+            },
+            "id": "respond-accepted",
+            "name": "Respond Accepted",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                1040,
+                300
+            ]
         }
-      },
-      "id": "send-gateway",
-      "name": "Send to Gateway",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        760,
-        300
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { status: 'dispatched', job_id: $('Validate & Build Job').first().json.job_id, gateway_response: $json } }}",
-        "options": {
-          "responseCode": 202
+    ],
+    "connections": {
+        "Receive Dispatch Request": {
+            "main": [
+                [
+                    {
+                        "node": "Validate & Build Job",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validate & Build Job": {
+            "main": [
+                [
+                    {
+                        "node": "Send to Gateway",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send to Gateway": {
+            "main": [
+                [
+                    {
+                        "node": "Respond Accepted",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
-      },
-      "id": "respond-accepted",
-      "name": "Respond Accepted",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        1040,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Receive Dispatch Request": {
-      "main": [
-        [
-          {
-            "node": "Validate & Build Job",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     },
-    "Validate & Build Job": {
-      "main": [
-        [
-          {
-            "node": "Send to Gateway",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
     },
-    "Send to Gateway": {
-      "main": [
-        [
-          {
-            "node": "Respond Accepted",
-            "type": "main",
-            "index": 0
-          }
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "c927cf5b-5555-425e-9694-c54aedc14926",
+    "activeVersionId": "c927cf5b-5555-425e-9694-c54aedc14926",
+    "versionCounter": 11,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-14T11:52:36.573Z",
+            "createdAt": "2026-03-14T11:52:36.573Z",
+            "role": "workflow:owner",
+            "workflowId": "37yXgGz5I8z32Pwd",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-14T12:23:14.908Z",
+        "createdAt": "2026-03-14T12:23:14.908Z",
+        "versionId": "c927cf5b-5555-425e-9694-c54aedc14926",
+        "workflowId": "37yXgGz5I8z32Pwd",
+        "nodes": [
+            {
+                "parameters": {
+                    "path": "opencode-agent/dispatch",
+                    "httpMethod": "POST",
+                    "responseMode": "responseNode"
+                },
+                "id": "dispatch-webhook",
+                "name": "Receive Dispatch Request",
+                "type": "n8n-nodes-base.webhook",
+                "typeVersion": 2,
+                "position": [
+                    220,
+                    300
+                ],
+                "webhookId": "584f444f"
+            },
+            {
+                "parameters": {
+                    "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst prompt = body.prompt;\nconst repo = body.repo;\nconst model = body.model || 'openai/gpt-5.4';\nconst mode = body.mode || 'run';\nconst idempotency_key = body.idempotency_key;\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst { randomUUID } = require('crypto');\nconst job_id = randomUUID();\n\nconst gateway_request = {\n  job_id,\n  prompt,\n  repo,\n  model,\n  mode,\n  callback_url: 'https://n8n.jclee.me/webhook/opencode-agent/callback',\n  idempotency_key: idempotency_key || job_id,\n};\n\nreturn {\n  job_id,\n  gateway_request,\n};"
+                },
+                "id": "validate-build-job",
+                "name": "Validate & Build Job",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    480,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "POST",
+                    "url": "http://192.168.50.108:7800/jobs",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify($json.gateway_request) }}",
+                    "options": {
+                        "timeout": 10000
+                    }
+                },
+                "id": "send-gateway",
+                "name": "Send to Gateway",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    760,
+                    300
+                ],
+                "continueOnFail": true
+            },
+            {
+                "parameters": {
+                    "respondWith": "json",
+                    "responseBody": "={{ { status: 'dispatched', job_id: $('Validate & Build Job').first().json.job_id, gateway_response: $json } }}",
+                    "options": {
+                        "responseCode": 202
+                    }
+                },
+                "id": "respond-accepted",
+                "name": "Respond Accepted",
+                "type": "n8n-nodes-base.respondToWebhook",
+                "typeVersion": 1.5,
+                "position": [
+                    1040,
+                    300
+                ]
+            }
+        ],
+        "connections": {
+            "Receive Dispatch Request": {
+                "main": [
+                    [
+                        {
+                            "node": "Validate & Build Job",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Validate & Build Job": {
+                "main": [
+                    [
+                        {
+                            "node": "Send to Gateway",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Send to Gateway": {
+                "main": [
+                    [
+                        {
+                            "node": "Respond Accepted",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "Admin Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-14T12:23:23.154Z",
+                "id": 52,
+                "workflowId": "37yXgGz5I8z32Pwd",
+                "versionId": "c927cf5b-5555-425e-9694-c54aedc14926",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
     }
-  },
-  "settings": {
-    "executionTimeout": 30,
-    "saveExecutionProgress": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "timezone": "Asia/Seoul"
-  }
 }

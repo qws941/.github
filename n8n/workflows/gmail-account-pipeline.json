@@ -1,0 +1,501 @@
+{
+    "updatedAt": "2026-03-14T11:58:54.949Z",
+    "createdAt": "2026-03-14T11:58:54.949Z",
+    "id": "vItUvPJcJ3QSLHhD",
+    "name": "gmail-account-pipeline",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+        {
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                100,
+                300
+            ],
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "gmail-pipeline",
+                "options": {
+                    "rawBody": false
+                },
+                "responseMode": "lastNode"
+            },
+            "id": "webhook-trigger"
+        },
+        {
+            "parameters": {
+                "jsCode": "const input = $input.first().json;\nconst start = Number(input.start || 1);\nconst end = Number(input.end || 50);\nconst action = input.action || 'create-accounts';\n\nif (start < 1 || start > 50) throw new Error('start must be 1-50');\nif (end < start || end > 50) throw new Error('end must be >= start and <= 50');\nif (!['create-accounts', 'family-group', 'full-pipeline'].includes(action))\n  throw new Error('action must be create-accounts|family-group|full-pipeline');\n\nreturn {\n  action,\n  start,\n  end,\n  accountCount: end - start + 1,\n  prefix: 'qws943',\n  triggeredAt: new Date().toISOString(),\n  dryRun: input.dryRun === true\n};"
+            },
+            "id": "validate-input",
+            "name": "Validate Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                350,
+                300
+            ]
+        },
+        {
+            "id": "route-action",
+            "name": "Route Action",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.2,
+            "position": [
+                600,
+                300
+            ],
+            "parameters": {
+                "options": {},
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        },
+                                        "id": "route-create",
+                                        "leftValue": "={{ $json.action }}",
+                                        "rightValue": "create-accounts"
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "create-accounts"
+                        },
+                        {
+                            "outputKey": "family-group",
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "rightValue": "family-group",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        },
+                                        "id": "route-family",
+                                        "leftValue": "={{ $json.action }}"
+                                    }
+                                ],
+                                "combinator": "and"
+                            }
+                        },
+                        {
+                            "outputKey": "full-pipeline",
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "id": "route-full",
+                                        "leftValue": "={{ $json.action }}",
+                                        "rightValue": "full-pipeline",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                900,
+                160
+            ],
+            "parameters": {
+                "command": "=cd /home/jclee/dev/gmail && node create-accounts.mjs --start {{ $json.start }} --end {{ $json.end }}{{ $json.dryRun ? ' --dry-run' : '' }}"
+            },
+            "id": "run-create-accounts",
+            "name": "Run Account Creator"
+        },
+        {
+            "parameters": {
+                "jsCode": "const stdout = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\nconst exitCode = $input.first().json.exitCode ?? -1;\nconst input = $('Validate Input').first().json;\n\n// Count successes and failures from output\nconst successCount = (stdout.match(/\u2705/g) || []).length;\nconst failCount = (stdout.match(/\u274c/g) || []).length;\nconst manualCount = (stdout.match(/\u26a0\ufe0f/g) || []).length;\n\nreturn {\n  ...input,\n  stage: 'create-accounts',\n  isSuccess: exitCode === 0 && failCount === 0,\n  exitCode,\n  successCount,\n  failCount,\n  manualCheckCount: manualCount,\n  stdout: stdout.slice(-2000),\n  stderr: stderr.slice(-500),\n  completedAt: new Date().toISOString()\n};"
+            },
+            "id": "parse-create-result",
+            "name": "Parse Create Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1150,
+                160
+            ]
+        },
+        {
+            "id": "run-family-group",
+            "name": "Run Family Group",
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                900,
+                440
+            ],
+            "parameters": {
+                "command": "=cd /home/jclee/dev/gmail && node family-group.mjs --start {{ $json.start }} --end {{ $json.end }}{{ $json.dryRun ? ' --dry-run' : '' }}"
+            }
+        },
+        {
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1150,
+                440
+            ],
+            "parameters": {
+                "jsCode": "const stdout = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\nconst exitCode = $input.first().json.exitCode ?? -1;\nconst input = $('Validate Input').first().json;\n\nconst successCount = (stdout.match(/\u2705/g) || []).length;\nconst failCount = (stdout.match(/\u274c/g) || []).length;\n\nreturn {\n  ...input,\n  stage: 'family-group',\n  isSuccess: exitCode === 0 && failCount === 0,\n  exitCode,\n  successCount,\n  failCount,\n  stdout: stdout.slice(-2000),\n  stderr: stderr.slice(-500),\n  completedAt: new Date().toISOString()\n};"
+            },
+            "id": "parse-family-result",
+            "name": "Parse Family Result"
+        },
+        {
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                900,
+                680
+            ],
+            "parameters": {
+                "command": "=cd /home/jclee/dev/gmail && node create-accounts.mjs --start {{ $json.start }} --end {{ $json.end }}{{ $json.dryRun ? ' --dry-run' : '' }}"
+            },
+            "id": "full-create",
+            "name": "Full: Create Accounts"
+        },
+        {
+            "id": "full-parse-create",
+            "name": "Full: Parse Create",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1150,
+                680
+            ],
+            "parameters": {
+                "jsCode": "const stdout = $input.first().json.stdout || '';\nconst exitCode = $input.first().json.exitCode ?? -1;\nconst input = $('Validate Input').first().json;\nconst successCount = (stdout.match(/\u2705/g) || []).length;\nconst failCount = (stdout.match(/\u274c/g) || []).length;\n\nif (failCount > 0 && !input.dryRun) {\n  // Continue anyway but flag\n}\n\nreturn {\n  ...input,\n  createStage: { isSuccess: exitCode === 0, successCount, failCount },\n  stdout: stdout.slice(-1000)\n};"
+            }
+        },
+        {
+            "name": "Full: Wait Before Family",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1400,
+                680
+            ],
+            "parameters": {
+                "amount": "30",
+                "unit": "seconds"
+            },
+            "id": "full-wait"
+        },
+        {
+            "type": "n8n-nodes-base.executeCommand",
+            "typeVersion": 1,
+            "position": [
+                1650,
+                680
+            ],
+            "parameters": {
+                "command": "=cd /home/jclee/dev/gmail && node family-group.mjs --start {{ $('Full: Parse Create').first().json.start }} --end {{ $('Full: Parse Create').first().json.end }}{{ $('Full: Parse Create').first().json.dryRun ? ' --dry-run' : '' }}"
+            },
+            "id": "full-family",
+            "name": "Full: Family Group"
+        },
+        {
+            "id": "full-parse-family",
+            "name": "Full: Parse Family",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1900,
+                680
+            ],
+            "parameters": {
+                "jsCode": "const stdout = $input.first().json.stdout || '';\nconst exitCode = $input.first().json.exitCode ?? -1;\nconst createResult = $('Full: Parse Create').first().json;\nconst successCount = (stdout.match(/\u2705/g) || []).length;\nconst failCount = (stdout.match(/\u274c/g) || []).length;\n\nreturn {\n  action: 'full-pipeline',\n  start: createResult.start,\n  end: createResult.end,\n  accountCount: createResult.accountCount,\n  isSuccess: createResult.createStage.isSuccess && exitCode === 0,\n  createStage: createResult.createStage,\n  familyStage: { isSuccess: exitCode === 0, successCount, failCount },\n  completedAt: new Date().toISOString()\n};"
+            }
+        },
+        {
+            "typeVersion": 3,
+            "position": [
+                1500,
+                300
+            ],
+            "parameters": {
+                "output": "mixed",
+                "mode": "chooseBranch"
+            },
+            "id": "merge-results",
+            "name": "Merge Results",
+            "type": "n8n-nodes-base.merge"
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst emoji = data.isSuccess ? '\u2705' : '\u274c';\nconst stage = data.stage || data.action || 'unknown';\n\nconst blocks = [\n  `${emoji} *Gmail Pipeline \u2014 ${stage}*`,\n  `Accounts: \\`qws943${String(data.start).padStart(2,'0')}\\` \u2192 \\`qws943${String(data.end).padStart(2,'0')}\\` (${data.accountCount})`,\n];\n\nif (data.successCount !== undefined) {\n  blocks.push(`Success: ${data.successCount} | Failed: ${data.failCount || 0}`);\n}\nif (data.createStage) {\n  blocks.push(`Create: ${data.createStage.isSuccess ? '\u2705' : '\u274c'} (${data.createStage.successCount} ok, ${data.createStage.failCount} fail)`);\n}\nif (data.familyStage) {\n  blocks.push(`Family: ${data.familyStage.isSuccess ? '\u2705' : '\u274c'} (${data.familyStage.successCount} ok, ${data.familyStage.failCount} fail)`);\n}\n\nblocks.push(`Time: ${data.triggeredAt || ''} \u2192 ${data.completedAt || new Date().toISOString()}`);\n\nreturn {\n  channel: '#gmail-pipeline',\n  text: blocks.join('\\n'),\n  source: 'gmail-pipeline',\n  ...data\n};"
+            },
+            "id": "prepare-slack",
+            "name": "Prepare Slack Notification",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1750,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "source": "database",
+                "workflowId": "PV5yLgHNzNSlCmRT"
+            },
+            "id": "slack-notify",
+            "name": "Notify Slack",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                2000,
+                300
+            ]
+        },
+        {
+            "id": "return-response",
+            "name": "Return Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2250,
+                300
+            ],
+            "parameters": {
+                "jsCode": "const data = $('Prepare Slack Notification').first().json;\nreturn {\n  success: data.isSuccess,\n  action: data.action || data.stage,\n  accounts: { start: data.start, end: data.end, count: data.accountCount },\n  results: {\n    successCount: data.successCount,\n    failCount: data.failCount,\n    createStage: data.createStage,\n    familyStage: data.familyStage\n  },\n  timestamps: { triggered: data.triggeredAt, completed: data.completedAt }\n};"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Validate Input",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Full: Wait Before Family": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Full: Family Group"
+                    }
+                ]
+            ]
+        },
+        "Run Family Group": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Parse Family Result",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Prepare Slack Notification": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Notify Slack"
+                    }
+                ]
+            ]
+        },
+        "Full: Parse Create": {
+            "main": [
+                [
+                    {
+                        "node": "Full: Wait Before Family",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Full: Parse Family": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 2,
+                        "node": "Merge Results"
+                    }
+                ]
+            ]
+        },
+        "Full: Create Accounts": {
+            "main": [
+                [
+                    {
+                        "node": "Full: Parse Create",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Create Result": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Merge Results"
+                    }
+                ]
+            ]
+        },
+        "Run Account Creator": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Create Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify Slack": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Return Response"
+                    }
+                ]
+            ]
+        },
+        "Route Action": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Run Account Creator",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "index": 0,
+                        "node": "Run Family Group",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "node": "Full: Create Accounts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Family Result": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Results",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Merge Results": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Prepare Slack Notification"
+                    }
+                ]
+            ]
+        },
+        "Full: Family Group": {
+            "main": [
+                [
+                    {
+                        "node": "Full: Parse Family",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validate Input": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Route Action"
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "b3c165cf-1d69-4811-93d9-8589a5efee73",
+    "activeVersionId": null,
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "shared": [
+        {
+            "updatedAt": "2026-03-14T11:58:54.949Z",
+            "createdAt": "2026-03-14T11:58:54.949Z",
+            "role": "workflow:owner",
+            "workflowId": "vItUvPJcJ3QSLHhD",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": null
+}

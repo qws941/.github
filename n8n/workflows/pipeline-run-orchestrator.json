@@ -1,621 +1,1262 @@
 {
-  "id": "kWW5947tHQ8RqMFi",
-  "name": "pipeline-run-orchestrator",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "typeVersion": 1,
-      "position": [
-        100,
-        200
-      ],
-      "parameters": {},
-      "id": "orchestrator-trigger",
-      "name": "Execute Workflow Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger"
-    },
-    {
-      "name": "Initialize Retry State",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        350,
-        200
-      ],
-      "parameters": {
-        "jsCode": "if (!$vars.RETRY_MAX_ATTEMPTS) throw new Error('n8n Variable RETRY_MAX_ATTEMPTS is not set.');\nif (!$vars.RETRY_BASE_DELAY_SECONDS) throw new Error('n8n Variable RETRY_BASE_DELAY_SECONDS is not set.');\nif (!$vars.RETRY_MAX_BACKOFF_SECONDS) throw new Error('n8n Variable RETRY_MAX_BACKOFF_SECONDS is not set.');\nconst input = $input.first().json;\nreturn {\n  ...input,\n  attempt: 1,\n  maxAttempts: Number($vars.RETRY_MAX_ATTEMPTS),\n  baseDelay: Number($vars.RETRY_BASE_DELAY_SECONDS),\n  maxBackoff: Number($vars.RETRY_MAX_BACKOFF_SECONDS),\n  rootTriggeredAt: input.triggeredAt || new Date().toISOString()\n};"
-      },
-      "id": "init-retry"
-    },
-    {
-      "name": "Execute Queue Attempt",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1,
-      "position": [
-        620,
-        200
-      ],
-      "parameters": {
-        "source": "database",
-        "workflowId": "kRRZAx7krkcaCcpT"
-      },
-      "id": "execute-attempt"
-    },
-    {
-      "typeVersion": 2,
-      "position": [
-        890,
-        200
-      ],
-      "parameters": {
-        "jsCode": "const attemptResult = $input.first().json;\nlet retryState;\ntry { retryState = $('Increment Attempt').first().json; }\ncatch (e) { retryState = $('Initialize Retry State').first().json; }\nreturn {\n  ...attemptResult,\n  params: retryState.params ?? attemptResult.params ?? {},\n  attempt: retryState.attempt,\n  maxAttempts: retryState.maxAttempts,\n  baseDelay: retryState.baseDelay,\n  maxBackoff: retryState.maxBackoff,\n  rootTriggeredAt: retryState.rootTriggeredAt\n};"
-      },
-      "id": "normalize-result",
-      "name": "Normalize Attempt Result",
-      "type": "n8n-nodes-base.code"
-    },
-    {
-      "id": "if-success",
-      "name": "Attempt Succeeded?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.1,
-      "position": [
-        1160,
-        200
-      ],
-      "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ $json.isSuccess }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              },
-              "id": "success-check"
-            }
-          ],
-          "combinator": "and",
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          }
-        }
-      }
-    },
-    {
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1700,
-        80
-      ],
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline',\n  notificationType: 'final',\n  attempt: data.attempt,\n  maxAttempts: data.maxAttempts,\n  reviewPassed: data.reviewPassed ?? false,\n  reviewNotes: data.reviewNotes ?? null,\n  loopCount: data.loopCount ?? 0\n};"
-      },
-      "id": "prepare-final-slack",
-      "name": "Prepare Final Slack Input"
-    },
-    {
-      "name": "Notify via Slack",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1,
-      "position": [
-        1940,
-        80
-      ],
-      "parameters": {
-        "source": "database",
-        "workflowId": "PV5yLgHNzNSlCmRT"
-      },
-      "id": "notify-slack"
-    },
-    {
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2180,
-        80
-      ],
-      "parameters": {
-        "jsCode": "const data = $('Normalize Attempt Result').first().json;\nreturn {\n  ...data,\n  attemptCount: data.attempt,\n  retriedFrom: data.rootTriggeredAt\n};"
-      },
-      "id": "return-result",
-      "name": "Return Result"
-    },
-    {
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.1,
-      "position": [
-        1430,
-        320
-      ],
-      "parameters": {
-        "conditions": {
-          "combinator": "and",
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "retry-eligible",
-              "leftValue": "={{ ($json.attempt < $json.maxAttempts) && (($json.status === 'failed' || $json.timedOut) && !$json.youtubeId) }}",
-              "rightValue": true,
-              "operator": {
-                "operation": "equals",
-                "type": "boolean"
-              }
-            }
-          ]
-        }
-      },
-      "id": "if-retry",
-      "name": "Retry Eligible?"
-    },
-    {
-      "position": [
-        1700,
-        320
-      ],
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst delay = Math.min(data.baseDelay * Math.pow(2, data.attempt - 1), data.maxBackoff);\nreturn { ...data, backoffSeconds: delay };"
-      },
-      "id": "compute-backoff",
-      "name": "Compute Backoff",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2
-    },
-    {
-      "id": "retry-wait",
-      "name": "Retry Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        1940,
-        320
-      ],
-      "parameters": {
-        "amount": "={{ $json.backoffSeconds }}",
-        "unit": "seconds"
-      }
-    },
-    {
-      "name": "Increment Attempt",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2180,
-        320
-      ],
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nreturn { ...data, attempt: data.attempt + 1 };"
-      },
-      "id": "increment-attempt"
-    },
-    {
-      "id": "review-output",
-      "name": "Review Upload Output",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1440,
-        80
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const data = $('Normalize Attempt Result').first().json;\nconst notes = [];\nif (!data.youtubeId) notes.push('missing youtube id');\nif (!data.outputPath) notes.push('missing output path');\nif (data.errorMessage) notes.push(data.errorMessage);\nconst reviewPassed = notes.length === 0;\nreturn {\n  ...data,\n  reviewPassed,\n  reviewNotes: reviewPassed ? 'upload output looks complete' : notes.join('; ')\n};",
-        "notice": ""
-      }
-    },
-    {
-      "id": "check-next-topic",
-      "name": "Check Next Topic",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1712,
-        -120
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/topics",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
-          ]
+    "updatedAt": "2026-03-13T07:30:43.421Z",
+    "createdAt": "2026-03-12T23:06:13.952Z",
+    "id": "kWW5947tHQ8RqMFi",
+    "name": "pipeline-run-orchestrator",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "typeVersion": 1,
+            "position": [
+                100,
+                200
+            ],
+            "parameters": {},
+            "id": "orchestrator-trigger",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger"
         },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "channel",
-              "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+        {
+            "name": "Initialize Retry State",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                350,
+                200
+            ],
+            "parameters": {
+                "jsCode": "if (!$vars.RETRY_MAX_ATTEMPTS) throw new Error('n8n Variable RETRY_MAX_ATTEMPTS is not set.');\nif (!$vars.RETRY_BASE_DELAY_SECONDS) throw new Error('n8n Variable RETRY_BASE_DELAY_SECONDS is not set.');\nif (!$vars.RETRY_MAX_BACKOFF_SECONDS) throw new Error('n8n Variable RETRY_MAX_BACKOFF_SECONDS is not set.');\nconst input = $input.first().json;\nreturn {\n  ...input,\n  attempt: 1,\n  maxAttempts: Number($vars.RETRY_MAX_ATTEMPTS),\n  baseDelay: Number($vars.RETRY_BASE_DELAY_SECONDS),\n  maxBackoff: Number($vars.RETRY_MAX_BACKOFF_SECONDS),\n  rootTriggeredAt: input.triggeredAt || new Date().toISOString()\n};"
             },
-            {
-              "name": "is_used",
-              "value": "=eq.false"
-            },
-            {
-              "name": "select",
-              "value": "id"
-            },
-            {
-              "name": "order",
-              "value": "priority.desc,id.asc"
-            },
-            {
-              "name": "limit",
-              "value": "1"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "prepare-next-upload",
-      "name": "Prepare Next Upload",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1952,
-        -120
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const data = $('Review Upload Output').first().json;\nconst topics = Array.isArray($('Check Next Topic').first().json) ? $('Check Next Topic').first().json : [];\nconst active = Array.isArray($input.first().json) ? $input.first().json : [];\nconst loopCount = Number(data.loopCount || 0) + 1;\nconst hasNextTopic = topics.length > 0;\nconst hasActiveCommand = active.length > 0;\nreturn {\n  ...data,\n  loopCount,\n  hasNextTopic,\n  hasActiveCommand,\n  nextTopicId: hasNextTopic ? topics[0].id : null,\n  canContinue: data.reviewPassed && hasNextTopic && !hasActiveCommand\n};",
-        "notice": ""
-      }
-    },
-    {
-      "id": "if-next-upload",
-      "name": "Continue Upload Loop?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.1,
-      "position": [
-        2192,
-        -120
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "next-upload-check",
-              "leftValue": "={{ $json.canContinue }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
+            "id": "init-retry"
         },
-        "looseTypeValidation": false,
-        "options": {}
-      }
-    },
-    {
-      "id": "next-video-wait",
-      "name": "Next Video Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        2432,
-        -200
-      ],
-      "parameters": {
-        "resume": "timeInterval",
-        "amount": "5",
-        "unit": "seconds"
-      }
-    },
-    {
-      "id": "upload-next-video",
-      "name": "Upload Next Video",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1,
-      "position": [
-        2672,
-        -200
-      ],
-      "parameters": {
-        "source": "database",
-        "workflowId": "kWW5947tHQ8RqMFi"
-      }
-    },
-    {
-      "id": "check-active-command",
-      "name": "Check Active Command",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1952,
-        -240
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+        {
+            "name": "Execute Queue Attempt",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                620,
+                200
+            ],
+            "parameters": {
+                "source": "database",
+                "workflowId": "kRRZAx7krkcaCcpT"
             },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
-          ]
+            "id": "execute-attempt"
         },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "channel",
-              "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+        {
+            "typeVersion": 2,
+            "position": [
+                890,
+                200
+            ],
+            "parameters": {
+                "jsCode": "const attemptResult = $input.first().json;\nlet retryState;\ntry { retryState = $('Increment Attempt').first().json; }\ncatch (e) { retryState = $('Initialize Retry State').first().json; }\nreturn {\n  ...attemptResult,\n  params: retryState.params ?? attemptResult.params ?? {},\n  attempt: retryState.attempt,\n  maxAttempts: retryState.maxAttempts,\n  baseDelay: retryState.baseDelay,\n  maxBackoff: retryState.maxBackoff,\n  rootTriggeredAt: retryState.rootTriggeredAt\n};"
             },
-            {
-              "name": "status",
-              "value": "in.(pending,running)"
-            },
-            {
-              "name": "select",
-              "value": "id"
-            },
-            {
-              "name": "limit",
-              "value": "1"
+            "id": "normalize-result",
+            "name": "Normalize Attempt Result",
+            "type": "n8n-nodes-base.code"
+        },
+        {
+            "id": "if-success",
+            "name": "Attempt Succeeded?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.1,
+            "position": [
+                1160,
+                200
+            ],
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.isSuccess }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            },
+                            "id": "success-check"
+                        }
+                    ],
+                    "combinator": "and",
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    }
+                }
             }
-          ]
+        },
+        {
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1700,
+                80
+            ],
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline',\n  notificationType: 'final',\n  attempt: data.attempt,\n  maxAttempts: data.maxAttempts,\n  reviewPassed: data.reviewPassed ?? false,\n  reviewNotes: data.reviewNotes ?? null,\n  loopCount: data.loopCount ?? 0\n};"
+            },
+            "id": "prepare-final-slack",
+            "name": "Prepare Final Slack Input"
+        },
+        {
+            "name": "Notify via Slack",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                1940,
+                80
+            ],
+            "parameters": {
+                "source": "database",
+                "workflowId": "PV5yLgHNzNSlCmRT"
+            },
+            "id": "notify-slack"
+        },
+        {
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2180,
+                80
+            ],
+            "parameters": {
+                "jsCode": "const data = $('Normalize Attempt Result').first().json;\nreturn {\n  ...data,\n  attemptCount: data.attempt,\n  retriedFrom: data.rootTriggeredAt\n};"
+            },
+            "id": "return-result",
+            "name": "Return Result"
+        },
+        {
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.1,
+            "position": [
+                1430,
+                320
+            ],
+            "parameters": {
+                "conditions": {
+                    "combinator": "and",
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "retry-eligible",
+                            "leftValue": "={{ ($json.attempt < $json.maxAttempts) && (($json.status === 'failed' || $json.timedOut) && !$json.youtubeId) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "operation": "equals",
+                                "type": "boolean"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "if-retry",
+            "name": "Retry Eligible?"
+        },
+        {
+            "position": [
+                1700,
+                320
+            ],
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst delay = Math.min(data.baseDelay * Math.pow(2, data.attempt - 1), data.maxBackoff);\nreturn { ...data, backoffSeconds: delay };"
+            },
+            "id": "compute-backoff",
+            "name": "Compute Backoff",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2
+        },
+        {
+            "id": "retry-wait",
+            "name": "Retry Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1940,
+                320
+            ],
+            "parameters": {
+                "amount": "={{ $json.backoffSeconds }}",
+                "unit": "seconds"
+            }
+        },
+        {
+            "name": "Increment Attempt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2180,
+                320
+            ],
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nreturn { ...data, attempt: data.attempt + 1 };"
+            },
+            "id": "increment-attempt"
+        },
+        {
+            "id": "review-output",
+            "name": "Review Upload Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1440,
+                80
+            ],
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "language": "javaScript",
+                "jsCode": "const data = $('Normalize Attempt Result').first().json;\nconst notes = [];\nif (!data.youtubeId) notes.push('missing youtube id');\nif (!data.outputPath) notes.push('missing output path');\nif (data.errorMessage) notes.push(data.errorMessage);\nconst reviewPassed = notes.length === 0;\nreturn {\n  ...data,\n  reviewPassed,\n  reviewNotes: reviewPassed ? 'upload output looks complete' : notes.join('; ')\n};",
+                "notice": ""
+            }
+        },
+        {
+            "id": "check-next-topic",
+            "name": "Check Next Topic",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1712,
+                -120
+            ],
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/topics",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        }
+                    ]
+                },
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "channel",
+                            "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+                        },
+                        {
+                            "name": "is_used",
+                            "value": "=eq.false"
+                        },
+                        {
+                            "name": "select",
+                            "value": "id"
+                        },
+                        {
+                            "name": "order",
+                            "value": "priority.desc,id.asc"
+                        },
+                        {
+                            "name": "limit",
+                            "value": "1"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "prepare-next-upload",
+            "name": "Prepare Next Upload",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1952,
+                -120
+            ],
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "language": "javaScript",
+                "jsCode": "const data = $('Review Upload Output').first().json;\nconst topics = Array.isArray($('Check Next Topic').first().json) ? $('Check Next Topic').first().json : [];\nconst active = Array.isArray($input.first().json) ? $input.first().json : [];\nconst loopCount = Number(data.loopCount || 0) + 1;\nconst hasNextTopic = topics.length > 0;\nconst hasActiveCommand = active.length > 0;\nreturn {\n  ...data,\n  loopCount,\n  hasNextTopic,\n  hasActiveCommand,\n  nextTopicId: hasNextTopic ? topics[0].id : null,\n  canContinue: data.reviewPassed && hasNextTopic && !hasActiveCommand\n};",
+                "notice": ""
+            }
+        },
+        {
+            "id": "if-next-upload",
+            "name": "Continue Upload Loop?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.1,
+            "position": [
+                2192,
+                -120
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "next-upload-check",
+                            "leftValue": "={{ $json.canContinue }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "looseTypeValidation": false,
+                "options": {}
+            }
+        },
+        {
+            "id": "next-video-wait",
+            "name": "Next Video Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                2432,
+                -200
+            ],
+            "parameters": {
+                "resume": "timeInterval",
+                "amount": "5",
+                "unit": "seconds"
+            }
+        },
+        {
+            "id": "upload-next-video",
+            "name": "Upload Next Video",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                2672,
+                -200
+            ],
+            "parameters": {
+                "source": "database",
+                "workflowId": "kWW5947tHQ8RqMFi"
+            }
+        },
+        {
+            "id": "check-active-command",
+            "name": "Check Active Command",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1952,
+                -240
+            ],
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        }
+                    ]
+                },
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "channel",
+                            "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+                        },
+                        {
+                            "name": "status",
+                            "value": "in.(pending,running)"
+                        },
+                        {
+                            "name": "select",
+                            "value": "id"
+                        },
+                        {
+                            "name": "limit",
+                            "value": "1"
+                        }
+                    ]
+                }
+            }
         }
-      }
+    ],
+    "connections": {
+        "Compute Backoff": {
+            "main": [
+                [
+                    {
+                        "node": "Retry Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Retry Eligible?": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Compute Backoff",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "node": "Prepare Final Slack Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Retry Wait": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Increment Attempt"
+                    }
+                ]
+            ]
+        },
+        "Initialize Retry State": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Execute Queue Attempt",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Attempt Succeeded?": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Review Upload Output",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "node": "Retry Eligible?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Final Slack Input": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Notify via Slack",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Increment Attempt": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Execute Queue Attempt",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Notify via Slack": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Return Result",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Execute Queue Attempt": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Normalize Attempt Result"
+                    }
+                ]
+            ]
+        },
+        "Execute Workflow Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Initialize Retry State",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Normalize Attempt Result": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Attempt Succeeded?",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Review Upload Output": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Prepare Final Slack Input",
+                        "type": "main"
+                    },
+                    {
+                        "index": 0,
+                        "node": "Check Next Topic",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Check Next Topic": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Check Active Command",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Prepare Next Upload": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Continue Upload Loop?",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Continue Upload Loop?": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Next Video Wait",
+                        "type": "main"
+                    }
+                ],
+                []
+            ]
+        },
+        "Next Video Wait": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Upload Next Video",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Check Active Command": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Prepare Next Upload",
+                        "type": "main"
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": {},
+    "versionId": "7d8f11e8-1fcd-4887-bf9c-c04f19436778",
+    "activeVersionId": "7d8f11e8-1fcd-4887-bf9c-c04f19436778",
+    "versionCounter": 17,
+    "triggerCount": 0,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T23:06:13.952Z",
+            "createdAt": "2026-03-12T23:06:13.952Z",
+            "role": "workflow:owner",
+            "workflowId": "kWW5947tHQ8RqMFi",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-13T07:30:43.422Z",
+        "createdAt": "2026-03-13T07:30:43.422Z",
+        "versionId": "7d8f11e8-1fcd-4887-bf9c-c04f19436778",
+        "workflowId": "kWW5947tHQ8RqMFi",
+        "nodes": [
+            {
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    200
+                ],
+                "parameters": {},
+                "id": "orchestrator-trigger",
+                "name": "Execute Workflow Trigger",
+                "type": "n8n-nodes-base.executeWorkflowTrigger"
+            },
+            {
+                "name": "Initialize Retry State",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    350,
+                    200
+                ],
+                "parameters": {
+                    "jsCode": "if (!$vars.RETRY_MAX_ATTEMPTS) throw new Error('n8n Variable RETRY_MAX_ATTEMPTS is not set.');\nif (!$vars.RETRY_BASE_DELAY_SECONDS) throw new Error('n8n Variable RETRY_BASE_DELAY_SECONDS is not set.');\nif (!$vars.RETRY_MAX_BACKOFF_SECONDS) throw new Error('n8n Variable RETRY_MAX_BACKOFF_SECONDS is not set.');\nconst input = $input.first().json;\nreturn {\n  ...input,\n  attempt: 1,\n  maxAttempts: Number($vars.RETRY_MAX_ATTEMPTS),\n  baseDelay: Number($vars.RETRY_BASE_DELAY_SECONDS),\n  maxBackoff: Number($vars.RETRY_MAX_BACKOFF_SECONDS),\n  rootTriggeredAt: input.triggeredAt || new Date().toISOString()\n};"
+                },
+                "id": "init-retry"
+            },
+            {
+                "name": "Execute Queue Attempt",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1,
+                "position": [
+                    620,
+                    200
+                ],
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "kRRZAx7krkcaCcpT"
+                },
+                "id": "execute-attempt"
+            },
+            {
+                "typeVersion": 2,
+                "position": [
+                    890,
+                    200
+                ],
+                "parameters": {
+                    "jsCode": "const attemptResult = $input.first().json;\nlet retryState;\ntry { retryState = $('Increment Attempt').first().json; }\ncatch (e) { retryState = $('Initialize Retry State').first().json; }\nreturn {\n  ...attemptResult,\n  params: retryState.params ?? attemptResult.params ?? {},\n  attempt: retryState.attempt,\n  maxAttempts: retryState.maxAttempts,\n  baseDelay: retryState.baseDelay,\n  maxBackoff: retryState.maxBackoff,\n  rootTriggeredAt: retryState.rootTriggeredAt\n};"
+                },
+                "id": "normalize-result",
+                "name": "Normalize Attempt Result",
+                "type": "n8n-nodes-base.code"
+            },
+            {
+                "id": "if-success",
+                "name": "Attempt Succeeded?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2.1,
+                "position": [
+                    1160,
+                    200
+                ],
+                "parameters": {
+                    "conditions": {
+                        "conditions": [
+                            {
+                                "leftValue": "={{ $json.isSuccess }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "type": "boolean",
+                                    "operation": "equals"
+                                },
+                                "id": "success-check"
+                            }
+                        ],
+                        "combinator": "and",
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict"
+                        }
+                    }
+                }
+            },
+            {
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1700,
+                    80
+                ],
+                "parameters": {
+                    "jsCode": "const data = $input.first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: data.command,\n  duration: data.duration,\n  youtubeId: data.youtubeId,\n  outputUrl: data.outputPath,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'pipeline',\n  notificationType: 'final',\n  attempt: data.attempt,\n  maxAttempts: data.maxAttempts,\n  reviewPassed: data.reviewPassed ?? false,\n  reviewNotes: data.reviewNotes ?? null,\n  loopCount: data.loopCount ?? 0\n};"
+                },
+                "id": "prepare-final-slack",
+                "name": "Prepare Final Slack Input"
+            },
+            {
+                "name": "Notify via Slack",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1,
+                "position": [
+                    1940,
+                    80
+                ],
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "PV5yLgHNzNSlCmRT"
+                },
+                "id": "notify-slack"
+            },
+            {
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2180,
+                    80
+                ],
+                "parameters": {
+                    "jsCode": "const data = $('Normalize Attempt Result').first().json;\nreturn {\n  ...data,\n  attemptCount: data.attempt,\n  retriedFrom: data.rootTriggeredAt\n};"
+                },
+                "id": "return-result",
+                "name": "Return Result"
+            },
+            {
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2.1,
+                "position": [
+                    1430,
+                    320
+                ],
+                "parameters": {
+                    "conditions": {
+                        "combinator": "and",
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict"
+                        },
+                        "conditions": [
+                            {
+                                "id": "retry-eligible",
+                                "leftValue": "={{ ($json.attempt < $json.maxAttempts) && (($json.status === 'failed' || $json.timedOut) && !$json.youtubeId) }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "boolean"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "id": "if-retry",
+                "name": "Retry Eligible?"
+            },
+            {
+                "position": [
+                    1700,
+                    320
+                ],
+                "parameters": {
+                    "jsCode": "const data = $input.first().json;\nconst delay = Math.min(data.baseDelay * Math.pow(2, data.attempt - 1), data.maxBackoff);\nreturn { ...data, backoffSeconds: delay };"
+                },
+                "id": "compute-backoff",
+                "name": "Compute Backoff",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2
+            },
+            {
+                "id": "retry-wait",
+                "name": "Retry Wait",
+                "type": "n8n-nodes-base.wait",
+                "typeVersion": 1.1,
+                "position": [
+                    1940,
+                    320
+                ],
+                "parameters": {
+                    "amount": "={{ $json.backoffSeconds }}",
+                    "unit": "seconds"
+                }
+            },
+            {
+                "name": "Increment Attempt",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2180,
+                    320
+                ],
+                "parameters": {
+                    "jsCode": "const data = $input.first().json;\nreturn { ...data, attempt: data.attempt + 1 };"
+                },
+                "id": "increment-attempt"
+            },
+            {
+                "id": "review-output",
+                "name": "Review Upload Output",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1440,
+                    80
+                ],
+                "parameters": {
+                    "mode": "runOnceForAllItems",
+                    "language": "javaScript",
+                    "jsCode": "const data = $('Normalize Attempt Result').first().json;\nconst notes = [];\nif (!data.youtubeId) notes.push('missing youtube id');\nif (!data.outputPath) notes.push('missing output path');\nif (data.errorMessage) notes.push(data.errorMessage);\nconst reviewPassed = notes.length === 0;\nreturn {\n  ...data,\n  reviewPassed,\n  reviewNotes: reviewPassed ? 'upload output looks complete' : notes.join('; ')\n};",
+                    "notice": ""
+                }
+            },
+            {
+                "id": "check-next-topic",
+                "name": "Check Next Topic",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1712,
+                    -120
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/topics",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            }
+                        ]
+                    },
+                    "sendQuery": true,
+                    "queryParameters": {
+                        "parameters": [
+                            {
+                                "name": "channel",
+                                "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+                            },
+                            {
+                                "name": "is_used",
+                                "value": "=eq.false"
+                            },
+                            {
+                                "name": "select",
+                                "value": "id"
+                            },
+                            {
+                                "name": "order",
+                                "value": "priority.desc,id.asc"
+                            },
+                            {
+                                "name": "limit",
+                                "value": "1"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "id": "prepare-next-upload",
+                "name": "Prepare Next Upload",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1952,
+                    -120
+                ],
+                "parameters": {
+                    "mode": "runOnceForAllItems",
+                    "language": "javaScript",
+                    "jsCode": "const data = $('Review Upload Output').first().json;\nconst topics = Array.isArray($('Check Next Topic').first().json) ? $('Check Next Topic').first().json : [];\nconst active = Array.isArray($input.first().json) ? $input.first().json : [];\nconst loopCount = Number(data.loopCount || 0) + 1;\nconst hasNextTopic = topics.length > 0;\nconst hasActiveCommand = active.length > 0;\nreturn {\n  ...data,\n  loopCount,\n  hasNextTopic,\n  hasActiveCommand,\n  nextTopicId: hasNextTopic ? topics[0].id : null,\n  canContinue: data.reviewPassed && hasNextTopic && !hasActiveCommand\n};",
+                    "notice": ""
+                }
+            },
+            {
+                "id": "if-next-upload",
+                "name": "Continue Upload Loop?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2.1,
+                "position": [
+                    2192,
+                    -120
+                ],
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict"
+                        },
+                        "conditions": [
+                            {
+                                "id": "next-upload-check",
+                                "leftValue": "={{ $json.canContinue }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "type": "boolean",
+                                    "operation": "equals"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    },
+                    "looseTypeValidation": false,
+                    "options": {}
+                }
+            },
+            {
+                "id": "next-video-wait",
+                "name": "Next Video Wait",
+                "type": "n8n-nodes-base.wait",
+                "typeVersion": 1.1,
+                "position": [
+                    2432,
+                    -200
+                ],
+                "parameters": {
+                    "resume": "timeInterval",
+                    "amount": "5",
+                    "unit": "seconds"
+                }
+            },
+            {
+                "id": "upload-next-video",
+                "name": "Upload Next Video",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1,
+                "position": [
+                    2672,
+                    -200
+                ],
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "kWW5947tHQ8RqMFi"
+                }
+            },
+            {
+                "id": "check-active-command",
+                "name": "Check Active Command",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1952,
+                    -240
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            }
+                        ]
+                    },
+                    "sendQuery": true,
+                    "queryParameters": {
+                        "parameters": [
+                            {
+                                "name": "channel",
+                                "value": "=eq.{{ $('Review Upload Output').first().json.channel }}"
+                            },
+                            {
+                                "name": "status",
+                                "value": "in.(pending,running)"
+                            },
+                            {
+                                "name": "select",
+                                "value": "id"
+                            },
+                            {
+                                "name": "limit",
+                                "value": "1"
+                            }
+                        ]
+                    }
+                }
+            }
+        ],
+        "connections": {
+            "Compute Backoff": {
+                "main": [
+                    [
+                        {
+                            "node": "Retry Wait",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Retry Eligible?": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Compute Backoff",
+                            "type": "main"
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Prepare Final Slack Input",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Retry Wait": {
+                "main": [
+                    [
+                        {
+                            "type": "main",
+                            "index": 0,
+                            "node": "Increment Attempt"
+                        }
+                    ]
+                ]
+            },
+            "Initialize Retry State": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Execute Queue Attempt",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Attempt Succeeded?": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Review Upload Output",
+                            "type": "main"
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Retry Eligible?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Final Slack Input": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Notify via Slack",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Increment Attempt": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Execute Queue Attempt",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Notify via Slack": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Return Result",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Execute Queue Attempt": {
+                "main": [
+                    [
+                        {
+                            "type": "main",
+                            "index": 0,
+                            "node": "Normalize Attempt Result"
+                        }
+                    ]
+                ]
+            },
+            "Execute Workflow Trigger": {
+                "main": [
+                    [
+                        {
+                            "node": "Initialize Retry State",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Normalize Attempt Result": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Attempt Succeeded?",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Review Upload Output": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Prepare Final Slack Input",
+                            "type": "main"
+                        },
+                        {
+                            "index": 0,
+                            "node": "Check Next Topic",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Check Next Topic": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Check Active Command",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Prepare Next Upload": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Continue Upload Loop?",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Continue Upload Loop?": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Next Video Wait",
+                            "type": "main"
+                        }
+                    ],
+                    []
+                ]
+            },
+            "Next Video Wait": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Upload Next Video",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Check Active Command": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Prepare Next Upload",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "Admin Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-13T07:30:43.497Z",
+                "id": 43,
+                "workflowId": "kWW5947tHQ8RqMFi",
+                "versionId": "7d8f11e8-1fcd-4887-bf9c-c04f19436778",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        ]
     }
-  ],
-  "connections": {
-    "Compute Backoff": {
-      "main": [
-        [
-          {
-            "node": "Retry Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Retry Eligible?": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Compute Backoff",
-            "type": "main"
-          }
-        ],
-        [
-          {
-            "node": "Prepare Final Slack Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Retry Wait": {
-      "main": [
-        [
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Increment Attempt"
-          }
-        ]
-      ]
-    },
-    "Initialize Retry State": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Execute Queue Attempt",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Attempt Succeeded?": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Review Upload Output",
-            "type": "main"
-          }
-        ],
-        [
-          {
-            "node": "Retry Eligible?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Final Slack Input": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Notify via Slack",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Increment Attempt": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Execute Queue Attempt",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Notify via Slack": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Return Result",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Execute Queue Attempt": {
-      "main": [
-        [
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Normalize Attempt Result"
-          }
-        ]
-      ]
-    },
-    "Execute Workflow Trigger": {
-      "main": [
-        [
-          {
-            "node": "Initialize Retry State",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalize Attempt Result": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Attempt Succeeded?",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Review Upload Output": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Prepare Final Slack Input",
-            "type": "main"
-          },
-          {
-            "index": 0,
-            "node": "Check Next Topic",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Check Next Topic": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Check Active Command",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Prepare Next Upload": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Continue Upload Loop?",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Continue Upload Loop?": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Next Video Wait",
-            "type": "main"
-          }
-        ],
-        []
-      ]
-    },
-    "Next Video Wait": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Upload Next Video",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Check Active Command": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Prepare Next Upload",
-            "type": "main"
-          }
-        ]
-      ]
-    }
-  },
-  "settings": {
-    "saveExecutionProgress": true,
-    "saveManualExecutions": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "executionTimeout": 3600,
-    "timezone": "UTC",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": null,
-  "meta": null,
-  "pinData": {},
-  "versionId": "7d8f11e8-1fcd-4887-bf9c-c04f19436778",
-  "createdAt": "2026-03-12T23:06:13.952Z",
-  "updatedAt": "2026-03-13T07:30:43.421Z"
 }

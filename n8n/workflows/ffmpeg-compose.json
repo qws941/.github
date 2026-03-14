@@ -1,314 +1,653 @@
 {
-  "id": "skrtZe28I9EKOxOW",
-  "name": "FFmpeg Compose",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "parameters": {},
-      "id": "ffmpeg-trigger",
-      "name": "Execute Workflow Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
-      "position": [
-        100,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FFMPEG_WORKER_URL }}/api/compose",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
+    "updatedAt": "2026-03-12T17:23:57.924Z",
+    "createdAt": "2026-03-12T17:23:57.924Z",
+    "id": "skrtZe28I9EKOxOW",
+    "name": "FFmpeg Compose",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "ffmpeg-trigger",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                100
+            ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ audioUrl: $json.audioUrl, scenes: $json.scenes, outputFormat: $json.outputFormat || 'mp4', resolution: $json.resolution || '1920x1080', fps: $json.fps || 30, transitions: $json.transitions || 'crossfade' }) }}"
-      },
-      "id": "post-compose",
-      "name": "POST Compose Request",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        400,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Config from n8n variables — fail-fast if not set\nif (!$vars.FFMPEG_POLL_SECONDS) throw new Error('n8n Variable FFMPEG_POLL_SECONDS is not set. Configure in Settings → Variables.');\nif (!$vars.FFMPEG_MAX_POLLS) throw new Error('n8n Variable FFMPEG_MAX_POLLS is not set. Configure in Settings → Variables.');\nconst maxPolls = Number($vars.FFMPEG_MAX_POLLS);\nif (isNaN(maxPolls) || maxPolls <= 0) throw new Error('n8n Variable FFMPEG_MAX_POLLS must be a positive number.');\nconst pollSeconds = Number($vars.FFMPEG_POLL_SECONDS);\nif (isNaN(pollSeconds) || pollSeconds <= 0) throw new Error('n8n Variable FFMPEG_POLL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\n\nreturn {\n  jobId: response.jobId,\n  status: response.status,\n  estimatedTime: response.estimatedTime || null,\n  channel: $('Execute Workflow Trigger').first().json.channel || 'unknown',\n  pollCount: 0,\n  maxPolls: maxPolls\n};"
-      },
-      "id": "parse-compose",
-      "name": "Parse Compose Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        700,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "amount": "={{ Number($vars.FFMPEG_POLL_SECONDS) }}",
-        "unit": "seconds"
-      },
-      "id": "ffmpeg-wait",
-      "name": "FFmpeg Poll Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        1000,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.FFMPEG_WORKER_URL }}/api/jobs/{{ $('Parse Compose Result').first().json.jobId }}"
-      },
-      "id": "check-ffmpeg-status",
-      "name": "Check FFmpeg Job Status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1300,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const response = $input.first().json;\n\n// Get loop state\nlet prevData;\ntry {\n  prevData = $('Continue FFmpeg Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Compose Result').first().json;\n}\n\nconst status = response.status;\nconst isTerminal = status === 'completed' || status === 'failed';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: status,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  outputUrl: response.outputUrl || null,\n  duration: response.duration || null,\n  fileSize: response.fileSize || null,\n  errorMessage: response.error || null\n};"
-      },
-      "id": "evaluate-ffmpeg",
-      "name": "Evaluate FFmpeg Status",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "ffmpeg-terminal-check",
-              "leftValue": "={{ $json.isTerminal }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.FFMPEG_WORKER_URL }}/api/compose",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ audioUrl: $json.audioUrl, scenes: $json.scenes, outputFormat: $json.outputFormat || 'mp4', resolution: $json.resolution || '1920x1080', fps: $json.fps || 30, transitions: $json.transitions || 'crossfade' }) }}"
+            },
+            "id": "post-compose",
+            "name": "POST Compose Request",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                400,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Config from n8n variables \u2014 fail-fast if not set\nif (!$vars.FFMPEG_POLL_SECONDS) throw new Error('n8n Variable FFMPEG_POLL_SECONDS is not set. Configure in Settings \u2192 Variables.');\nif (!$vars.FFMPEG_MAX_POLLS) throw new Error('n8n Variable FFMPEG_MAX_POLLS is not set. Configure in Settings \u2192 Variables.');\nconst maxPolls = Number($vars.FFMPEG_MAX_POLLS);\nif (isNaN(maxPolls) || maxPolls <= 0) throw new Error('n8n Variable FFMPEG_MAX_POLLS must be a positive number.');\nconst pollSeconds = Number($vars.FFMPEG_POLL_SECONDS);\nif (isNaN(pollSeconds) || pollSeconds <= 0) throw new Error('n8n Variable FFMPEG_POLL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\n\nreturn {\n  jobId: response.jobId,\n  status: response.status,\n  estimatedTime: response.estimatedTime || null,\n  channel: $('Execute Workflow Trigger').first().json.channel || 'unknown',\n  pollCount: 0,\n  maxPolls: maxPolls\n};"
+            },
+            "id": "parse-compose",
+            "name": "Parse Compose Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                700,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ Number($vars.FFMPEG_POLL_SECONDS) }}",
+                "unit": "seconds"
+            },
+            "id": "ffmpeg-wait",
+            "name": "FFmpeg Poll Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1000,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $env.FFMPEG_WORKER_URL }}/api/jobs/{{ $('Parse Compose Result').first().json.jobId }}"
+            },
+            "id": "check-ffmpeg-status",
+            "name": "Check FFmpeg Job Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1300,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = $input.first().json;\n\n// Get loop state\nlet prevData;\ntry {\n  prevData = $('Continue FFmpeg Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Compose Result').first().json;\n}\n\nconst status = response.status;\nconst isTerminal = status === 'completed' || status === 'failed';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: status,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  outputUrl: response.outputUrl || null,\n  duration: response.duration || null,\n  fileSize: response.fileSize || null,\n  errorMessage: response.error || null\n};"
+            },
+            "id": "evaluate-ffmpeg",
+            "name": "Evaluate FFmpeg Status",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1600,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "ffmpeg-terminal-check",
+                            "leftValue": "={{ $json.isTerminal }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "if-ffmpeg-terminal",
+            "name": "Is FFmpeg Done?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.1,
+            "position": [
+                1900,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "source": "database",
+                "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+            },
+            "id": "notify-slack",
+            "name": "Notify via Slack",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.1,
+            "position": [
+                2200,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Prepare input for Slack Notifier sub-workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: 'compose',\n  duration: data.duration ? `${data.duration}` : null,\n  youtubeId: null,\n  outputUrl: data.outputUrl,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'ffmpeg'\n};"
+            },
+            "id": "prepare-slack-input",
+            "name": "Prepare Slack Input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2200,
+                -200
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Return final result to calling workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  jobId: data.jobId,\n  status: data.status,\n  isSuccess: data.isSuccess,\n  outputUrl: data.outputUrl,\n  duration: data.duration,\n  fileSize: data.fileSize,\n  channel: data.channel,\n  pollCount: data.pollCount,\n  timedOut: data.timedOut\n};"
+            },
+            "id": "ffmpeg-return",
+            "name": "Return FFmpeg Result",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2500,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: prevData.status,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
+            },
+            "id": "ffmpeg-loop-continue",
+            "name": "Continue FFmpeg Polling",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2200,
+                300
+            ]
         }
-      },
-      "id": "if-ffmpeg-terminal",
-      "name": "Is FFmpeg Done?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.1,
-      "position": [
-        1900,
-        100
-      ]
+    ],
+    "connections": {
+        "Execute Workflow Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "POST Compose Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "POST Compose Request": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Compose Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Compose Result": {
+            "main": [
+                [
+                    {
+                        "node": "FFmpeg Poll Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "FFmpeg Poll Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Check FFmpeg Job Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check FFmpeg Job Status": {
+            "main": [
+                [
+                    {
+                        "node": "Evaluate FFmpeg Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evaluate FFmpeg Status": {
+            "main": [
+                [
+                    {
+                        "node": "Is FFmpeg Done?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is FFmpeg Done?": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Slack Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Continue FFmpeg Polling",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Slack Input": {
+            "main": [
+                [
+                    {
+                        "node": "Notify via Slack",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify via Slack": {
+            "main": [
+                [
+                    {
+                        "node": "Return FFmpeg Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Continue FFmpeg Polling": {
+            "main": [
+                [
+                    {
+                        "node": "FFmpeg Poll Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
     },
-    {
-      "parameters": {
-        "source": "database",
-        "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
-      },
-      "id": "notify-slack",
-      "name": "Notify via Slack",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.1,
-      "position": [
-        2200,
-        0
-      ]
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
     },
-    {
-      "parameters": {
-        "jsCode": "// Prepare input for Slack Notifier sub-workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: 'compose',\n  duration: data.duration ? `${data.duration}` : null,\n  youtubeId: null,\n  outputUrl: data.outputUrl,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'ffmpeg'\n};"
-      },
-      "id": "prepare-slack-input",
-      "name": "Prepare Slack Input",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2200,
-        -200
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Return final result to calling workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  jobId: data.jobId,\n  status: data.status,\n  isSuccess: data.isSuccess,\n  outputUrl: data.outputUrl,\n  duration: data.duration,\n  fileSize: data.fileSize,\n  channel: data.channel,\n  pollCount: data.pollCount,\n  timedOut: data.timedOut\n};"
-      },
-      "id": "ffmpeg-return",
-      "name": "Return FFmpeg Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2500,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: prevData.status,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
-      },
-      "id": "ffmpeg-loop-continue",
-      "name": "Continue FFmpeg Polling",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2200,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Execute Workflow Trigger": {
-      "main": [
-        [
-          {
-            "node": "POST Compose Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "POST Compose Request": {
-      "main": [
-        [
-          {
-            "node": "Parse Compose Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Compose Result": {
-      "main": [
-        [
-          {
-            "node": "FFmpeg Poll Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "FFmpeg Poll Wait": {
-      "main": [
-        [
-          {
-            "node": "Check FFmpeg Job Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check FFmpeg Job Status": {
-      "main": [
-        [
-          {
-            "node": "Evaluate FFmpeg Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Evaluate FFmpeg Status": {
-      "main": [
-        [
-          {
-            "node": "Is FFmpeg Done?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Is FFmpeg Done?": {
-      "main": [
-        [
-          {
-            "node": "Prepare Slack Input",
-            "type": "main",
-            "index": 0
-          }
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "54e57f9e-8179-402f-8b7a-00d6cd61c5ce",
+    "activeVersionId": "54e57f9e-8179-402f-8b7a-00d6cd61c5ce",
+    "versionCounter": 6,
+    "triggerCount": 0,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T17:23:57.924Z",
+            "createdAt": "2026-03-12T17:23:57.924Z",
+            "role": "workflow:owner",
+            "workflowId": "skrtZe28I9EKOxOW",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-12T17:23:57.926Z",
+        "createdAt": "2026-03-12T17:23:57.926Z",
+        "versionId": "54e57f9e-8179-402f-8b7a-00d6cd61c5ce",
+        "workflowId": "skrtZe28I9EKOxOW",
+        "nodes": [
+            {
+                "parameters": {},
+                "id": "ffmpeg-trigger",
+                "name": "Execute Workflow Trigger",
+                "type": "n8n-nodes-base.executeWorkflowTrigger",
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "POST",
+                    "url": "={{ $env.FFMPEG_WORKER_URL }}/api/compose",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    },
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ audioUrl: $json.audioUrl, scenes: $json.scenes, outputFormat: $json.outputFormat || 'mp4', resolution: $json.resolution || '1920x1080', fps: $json.fps || 30, transitions: $json.transitions || 'crossfade' }) }}"
+                },
+                "id": "post-compose",
+                "name": "POST Compose Request",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    400,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Config from n8n variables \u2014 fail-fast if not set\nif (!$vars.FFMPEG_POLL_SECONDS) throw new Error('n8n Variable FFMPEG_POLL_SECONDS is not set. Configure in Settings \u2192 Variables.');\nif (!$vars.FFMPEG_MAX_POLLS) throw new Error('n8n Variable FFMPEG_MAX_POLLS is not set. Configure in Settings \u2192 Variables.');\nconst maxPolls = Number($vars.FFMPEG_MAX_POLLS);\nif (isNaN(maxPolls) || maxPolls <= 0) throw new Error('n8n Variable FFMPEG_MAX_POLLS must be a positive number.');\nconst pollSeconds = Number($vars.FFMPEG_POLL_SECONDS);\nif (isNaN(pollSeconds) || pollSeconds <= 0) throw new Error('n8n Variable FFMPEG_POLL_SECONDS must be a positive number.');\n\nconst response = $input.first().json;\n\nreturn {\n  jobId: response.jobId,\n  status: response.status,\n  estimatedTime: response.estimatedTime || null,\n  channel: $('Execute Workflow Trigger').first().json.channel || 'unknown',\n  pollCount: 0,\n  maxPolls: maxPolls\n};"
+                },
+                "id": "parse-compose",
+                "name": "Parse Compose Result",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    700,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "amount": "={{ Number($vars.FFMPEG_POLL_SECONDS) }}",
+                    "unit": "seconds"
+                },
+                "id": "ffmpeg-wait",
+                "name": "FFmpeg Poll Wait",
+                "type": "n8n-nodes-base.wait",
+                "typeVersion": 1.1,
+                "position": [
+                    1000,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "GET",
+                    "url": "={{ $env.FFMPEG_WORKER_URL }}/api/jobs/{{ $('Parse Compose Result').first().json.jobId }}"
+                },
+                "id": "check-ffmpeg-status",
+                "name": "Check FFmpeg Job Status",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1300,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "const response = $input.first().json;\n\n// Get loop state\nlet prevData;\ntry {\n  prevData = $('Continue FFmpeg Polling').first().json;\n} catch (e) {\n  prevData = $('Parse Compose Result').first().json;\n}\n\nconst status = response.status;\nconst isTerminal = status === 'completed' || status === 'failed';\nconst pollCount = (prevData.pollCount || 0) + 1;\nconst maxPolls = prevData.maxPolls;\nconst timedOut = pollCount >= maxPolls;\n\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: status,\n  isTerminal: isTerminal || timedOut,\n  isSuccess: status === 'completed',\n  isFailed: status === 'failed' || timedOut,\n  timedOut: timedOut,\n  pollCount: pollCount,\n  maxPolls: maxPolls,\n  outputUrl: response.outputUrl || null,\n  duration: response.duration || null,\n  fileSize: response.fileSize || null,\n  errorMessage: response.error || null\n};"
+                },
+                "id": "evaluate-ffmpeg",
+                "name": "Evaluate FFmpeg Status",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1600,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict"
+                        },
+                        "conditions": [
+                            {
+                                "id": "ffmpeg-terminal-check",
+                                "leftValue": "={{ $json.isTerminal }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "type": "boolean",
+                                    "operation": "equals"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    }
+                },
+                "id": "if-ffmpeg-terminal",
+                "name": "Is FFmpeg Done?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2.1,
+                "position": [
+                    1900,
+                    100
+                ]
+            },
+            {
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+                },
+                "id": "notify-slack",
+                "name": "Notify via Slack",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1.1,
+                "position": [
+                    2200,
+                    0
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Prepare input for Slack Notifier sub-workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  channel: data.channel,\n  status: data.status,\n  command: 'compose',\n  duration: data.duration ? `${data.duration}` : null,\n  youtubeId: null,\n  outputUrl: data.outputUrl,\n  errorMessage: data.errorMessage,\n  isSuccess: data.isSuccess,\n  timedOut: data.timedOut,\n  pollCount: data.pollCount,\n  source: 'ffmpeg'\n};"
+                },
+                "id": "prepare-slack-input",
+                "name": "Prepare Slack Input",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2200,
+                    -200
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Return final result to calling workflow\nconst data = $('Evaluate FFmpeg Status').first().json;\nreturn {\n  jobId: data.jobId,\n  status: data.status,\n  isSuccess: data.isSuccess,\n  outputUrl: data.outputUrl,\n  duration: data.duration,\n  fileSize: data.fileSize,\n  channel: data.channel,\n  pollCount: data.pollCount,\n  timedOut: data.timedOut\n};"
+                },
+                "id": "ffmpeg-return",
+                "name": "Return FFmpeg Result",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2500,
+                    0
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Pass through loop state for next poll iteration\nconst prevData = $input.first().json;\nreturn {\n  jobId: prevData.jobId,\n  channel: prevData.channel,\n  status: prevData.status,\n  pollCount: prevData.pollCount,\n  maxPolls: prevData.maxPolls\n};"
+                },
+                "id": "ffmpeg-loop-continue",
+                "name": "Continue FFmpeg Polling",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2200,
+                    300
+                ]
+            }
         ],
-        [
-          {
-            "node": "Continue FFmpeg Polling",
-            "type": "main",
-            "index": 0
-          }
+        "connections": {
+            "Execute Workflow Trigger": {
+                "main": [
+                    [
+                        {
+                            "node": "POST Compose Request",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "POST Compose Request": {
+                "main": [
+                    [
+                        {
+                            "node": "Parse Compose Result",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Parse Compose Result": {
+                "main": [
+                    [
+                        {
+                            "node": "FFmpeg Poll Wait",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "FFmpeg Poll Wait": {
+                "main": [
+                    [
+                        {
+                            "node": "Check FFmpeg Job Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Check FFmpeg Job Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Evaluate FFmpeg Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Evaluate FFmpeg Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Is FFmpeg Done?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Is FFmpeg Done?": {
+                "main": [
+                    [
+                        {
+                            "node": "Prepare Slack Input",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Continue FFmpeg Polling",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Slack Input": {
+                "main": [
+                    [
+                        {
+                            "node": "Notify via Slack",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Notify via Slack": {
+                "main": [
+                    [
+                        {
+                            "node": "Return FFmpeg Result",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Continue FFmpeg Polling": {
+                "main": [
+                    [
+                        {
+                            "node": "FFmpeg Poll Wait",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "JC Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-12T17:23:58.506Z",
+                "id": 9,
+                "workflowId": "skrtZe28I9EKOxOW",
+                "versionId": "54e57f9e-8179-402f-8b7a-00d6cd61c5ce",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
-    },
-    "Prepare Slack Input": {
-      "main": [
-        [
-          {
-            "node": "Notify via Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify via Slack": {
-      "main": [
-        [
-          {
-            "node": "Return FFmpeg Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Continue FFmpeg Polling": {
-      "main": [
-        [
-          {
-            "node": "FFmpeg Poll Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
-  },
-  "settings": {
-    "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": null,
-  "meta": null,
-  "pinData": null,
-  "versionId": "54e57f9e-8179-402f-8b7a-00d6cd61c5ce",
-  "createdAt": "2026-03-12T17:23:57.924Z",
-  "updatedAt": "2026-03-12T17:23:57.924Z"
 }

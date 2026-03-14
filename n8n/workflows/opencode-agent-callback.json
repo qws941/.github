@@ -1,80 +1,204 @@
 {
-  "id": "SyANkPq5gdvjZHsI",
-  "name": "opencode-agent-callback",
-  "active": false,
-  "nodes": [
-    {
-      "parameters": {
-        "path": "opencode-agent/callback",
-        "httpMethod": "POST",
-        "responseMode": "lastNode"
-      },
-      "id": "callback-webhook",
-      "name": "Receive Callback",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        220,
-        300
-      ]
+    "updatedAt": "2026-03-14T12:23:56.166Z",
+    "createdAt": "2026-03-14T11:53:51.387Z",
+    "id": "SyANkPq5gdvjZHsI",
+    "name": "opencode-agent-callback",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "path": "opencode-agent/callback",
+                "httpMethod": "POST",
+                "responseMode": "lastNode"
+            },
+            "id": "callback-webhook",
+            "name": "Receive Callback",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                220,
+                300
+            ],
+            "webhookId": "e84bd55c"
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst job_id = body.job_id || null;\nconst status = body.status || 'unknown';\nconst result = body.result ?? null;\nconst error = body.error ?? null;\nconst duration_ms = typeof body.duration_ms === 'number' ? body.duration_ms : null;\nconst completed_at = body.completed_at || new Date().toISOString();\n\nconst truncate = (value, max = 500) => {\n  if (value === null || value === undefined) return null;\n  const text = typeof value === 'string' ? value : JSON.stringify(value);\n  return text.length > max ? `${text.slice(0, max)}...` : text;\n};\n\nconst summaryText = status === 'completed'\n  ? truncate(result, 400) || 'Completed without payload'\n  : truncate(error, 400) || 'Failed without error payload';\n\nconst blockKit = [\n  {\n    type: 'header',\n    text: {\n      type: 'plain_text',\n      text: `Opencode Agent ${status.toUpperCase()}`\n    }\n  },\n  {\n    type: 'section',\n    fields: [\n      { type: 'mrkdwn', text: `*Job ID:*\\n${job_id || 'unknown'}` },\n      { type: 'mrkdwn', text: `*Status:*\\n${status}` },\n      { type: 'mrkdwn', text: `*Duration:*\\n${duration_ms !== null ? `${duration_ms}ms` : 'n/a'}` },\n      { type: 'mrkdwn', text: `*Completed:*\\n${completed_at}` }\n    ]\n  },\n  {\n    type: 'section',\n    text: {\n      type: 'mrkdwn',\n      text: `*Summary:*\\n\\`\\`\\`${summaryText || 'n/a'}\\`\\`\\``\n    }\n  }\n];\n\nconsole.log('opencode-agent callback received', {\n  job_id,\n  status,\n  duration_ms,\n  completed_at,\n});\n\nreturn {\n  job_id,\n  status,\n  result,\n  error,\n  duration_ms,\n  completed_at,\n  blockKit,\n  channel: 'opencode-agent',\n  command: 'dispatch-callback',\n  duration: duration_ms !== null ? Math.round(duration_ms / 1000) : null,\n  errorMessage: truncate(error, 500),\n  isSuccess: status === 'completed',\n  source: 'opencode-agent',\n  outputUrl: null,\n  timedOut: status === 'timeout',\n  pollCount: null,\n};"
+            },
+            "id": "process-callback",
+            "name": "Log & Route Callback",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "source": "database",
+                "workflowId": "PV5yLgHNzNSlCmRT"
+            },
+            "id": "notify-slack",
+            "name": "Notify via Slack",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.1,
+            "position": [
+                780,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Receive Callback": {
+            "main": [
+                [
+                    {
+                        "node": "Log & Route Callback",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log & Route Callback": {
+            "main": [
+                [
+                    {
+                        "node": "Notify via Slack",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
     },
-    {
-      "parameters": {
-        "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst job_id = body.job_id || null;\nconst status = body.status || 'unknown';\nconst result = body.result ?? null;\nconst error = body.error ?? null;\nconst duration_ms = typeof body.duration_ms === 'number' ? body.duration_ms : null;\nconst completed_at = body.completed_at || new Date().toISOString();\n\nconst truncate = (value, max = 500) => {\n  if (value === null || value === undefined) return null;\n  const text = typeof value === 'string' ? value : JSON.stringify(value);\n  return text.length > max ? `${text.slice(0, max)}...` : text;\n};\n\nconst summaryText = status === 'completed'\n  ? truncate(result, 400) || 'Completed without payload'\n  : truncate(error, 400) || 'Failed without error payload';\n\nconst blockKit = [\n  {\n    type: 'header',\n    text: {\n      type: 'plain_text',\n      text: `Opencode Agent ${status.toUpperCase()}`\n    }\n  },\n  {\n    type: 'section',\n    fields: [\n      { type: 'mrkdwn', text: `*Job ID:*\\n${job_id || 'unknown'}` },\n      { type: 'mrkdwn', text: `*Status:*\\n${status}` },\n      { type: 'mrkdwn', text: `*Duration:*\\n${duration_ms !== null ? `${duration_ms}ms` : 'n/a'}` },\n      { type: 'mrkdwn', text: `*Completed:*\\n${completed_at}` }\n    ]\n  },\n  {\n    type: 'section',\n    text: {\n      type: 'mrkdwn',\n      text: `*Summary:*\\n\\`\\`\\`${summaryText || 'n/a'}\\`\\`\\``\n    }\n  }\n];\n\nconsole.log('opencode-agent callback received', {\n  job_id,\n  status,\n  duration_ms,\n  completed_at,\n});\n\nreturn {\n  job_id,\n  status,\n  result,\n  error,\n  duration_ms,\n  completed_at,\n  blockKit,\n  channel: 'opencode-agent',\n  command: 'dispatch-callback',\n  duration: duration_ms !== null ? Math.round(duration_ms / 1000) : null,\n  errorMessage: truncate(error, 500),\n  isSuccess: status === 'completed',\n  source: 'opencode-agent',\n  outputUrl: null,\n  timedOut: status === 'timeout',\n  pollCount: null,\n};"
-      },
-      "id": "process-callback",
-      "name": "Log & Route Callback",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        500,
-        300
-      ]
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
     },
-    {
-      "parameters": {
-        "source": "database",
-        "workflowId": "PV5yLgHNzNSlCmRT"
-      },
-      "id": "notify-slack",
-      "name": "Notify via Slack",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.1,
-      "position": [
-        780,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Receive Callback": {
-      "main": [
-        [
-          {
-            "node": "Log & Route Callback",
-            "type": "main",
-            "index": 0
-          }
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+    "activeVersionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-14T11:53:51.387Z",
+            "createdAt": "2026-03-14T11:53:51.387Z",
+            "role": "workflow:owner",
+            "workflowId": "SyANkPq5gdvjZHsI",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-14T12:23:56.166Z",
+        "createdAt": "2026-03-14T12:23:56.166Z",
+        "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+        "workflowId": "SyANkPq5gdvjZHsI",
+        "nodes": [
+            {
+                "parameters": {
+                    "path": "opencode-agent/callback",
+                    "httpMethod": "POST",
+                    "responseMode": "lastNode"
+                },
+                "id": "callback-webhook",
+                "name": "Receive Callback",
+                "type": "n8n-nodes-base.webhook",
+                "typeVersion": 2,
+                "position": [
+                    220,
+                    300
+                ],
+                "webhookId": "e84bd55c"
+            },
+            {
+                "parameters": {
+                    "jsCode": "const body = ($json.body && typeof $json.body === 'object') ? $json.body : $json;\n\nconst job_id = body.job_id || null;\nconst status = body.status || 'unknown';\nconst result = body.result ?? null;\nconst error = body.error ?? null;\nconst duration_ms = typeof body.duration_ms === 'number' ? body.duration_ms : null;\nconst completed_at = body.completed_at || new Date().toISOString();\n\nconst truncate = (value, max = 500) => {\n  if (value === null || value === undefined) return null;\n  const text = typeof value === 'string' ? value : JSON.stringify(value);\n  return text.length > max ? `${text.slice(0, max)}...` : text;\n};\n\nconst summaryText = status === 'completed'\n  ? truncate(result, 400) || 'Completed without payload'\n  : truncate(error, 400) || 'Failed without error payload';\n\nconst blockKit = [\n  {\n    type: 'header',\n    text: {\n      type: 'plain_text',\n      text: `Opencode Agent ${status.toUpperCase()}`\n    }\n  },\n  {\n    type: 'section',\n    fields: [\n      { type: 'mrkdwn', text: `*Job ID:*\\n${job_id || 'unknown'}` },\n      { type: 'mrkdwn', text: `*Status:*\\n${status}` },\n      { type: 'mrkdwn', text: `*Duration:*\\n${duration_ms !== null ? `${duration_ms}ms` : 'n/a'}` },\n      { type: 'mrkdwn', text: `*Completed:*\\n${completed_at}` }\n    ]\n  },\n  {\n    type: 'section',\n    text: {\n      type: 'mrkdwn',\n      text: `*Summary:*\\n\\`\\`\\`${summaryText || 'n/a'}\\`\\`\\``\n    }\n  }\n];\n\nconsole.log('opencode-agent callback received', {\n  job_id,\n  status,\n  duration_ms,\n  completed_at,\n});\n\nreturn {\n  job_id,\n  status,\n  result,\n  error,\n  duration_ms,\n  completed_at,\n  blockKit,\n  channel: 'opencode-agent',\n  command: 'dispatch-callback',\n  duration: duration_ms !== null ? Math.round(duration_ms / 1000) : null,\n  errorMessage: truncate(error, 500),\n  isSuccess: status === 'completed',\n  source: 'opencode-agent',\n  outputUrl: null,\n  timedOut: status === 'timeout',\n  pollCount: null,\n};"
+                },
+                "id": "process-callback",
+                "name": "Log & Route Callback",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    500,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "PV5yLgHNzNSlCmRT"
+                },
+                "id": "notify-slack",
+                "name": "Notify via Slack",
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1.1,
+                "position": [
+                    780,
+                    300
+                ]
+            }
+        ],
+        "connections": {
+            "Receive Callback": {
+                "main": [
+                    [
+                        {
+                            "node": "Log & Route Callback",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Log & Route Callback": {
+                "main": [
+                    [
+                        {
+                            "node": "Notify via Slack",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "Admin Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-14T12:23:56.766Z",
+                "id": 54,
+                "workflowId": "SyANkPq5gdvjZHsI",
+                "versionId": "a32eef3d-f297-43f4-994f-bb221f323a85",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
-    },
-    "Log & Route Callback": {
-      "main": [
-        [
-          {
-            "node": "Notify via Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
-  },
-  "settings": {
-    "executionTimeout": 30,
-    "saveExecutionProgress": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "timezone": "Asia/Seoul"
-  }
 }

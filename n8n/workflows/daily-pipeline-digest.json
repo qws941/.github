@@ -1,265 +1,546 @@
 {
-  "id": "1dYjVWNjO479N5aD",
-  "name": "daily-pipeline-digest",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "typeVersion": 1.2,
-      "id": "schedule-digest",
-      "name": "Schedule Trigger (Daily 23:30 KST)",
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "expression": "30 23 * * *",
-              "field": "cronExpression"
-            }
-          ]
-        }
-      },
-      "position": [
-        100,
-        200
-      ],
-      "type": "n8n-nodes-base.scheduleTrigger"
-    },
-    {
-      "name": "Load Digest Window",
-      "parameters": {
-        "jsCode": "if (!$vars.DIGEST_LOOKBACK_HOURS) throw new Error('n8n Variable DIGEST_LOOKBACK_HOURS is not set.');\nconst hours = Number($vars.DIGEST_LOOKBACK_HOURS);\nif (isNaN(hours) || hours <= 0) throw new Error('DIGEST_LOOKBACK_HOURS must be a positive number.');\nconst since = new Date(Date.now() - hours * 3600 * 1000).toISOString();\nreturn { lookbackHours: hours, since };"
-      },
-      "position": [
-        350,
-        200
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "load-window"
-    },
-    {
-      "position": [
-        620,
-        200
-      ],
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "query-commands",
-      "name": "Query Pipeline Commands",
-      "parameters": {
-        "sendHeaders": true,
-        "sendQuery": true,
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+    "updatedAt": "2026-03-12T23:16:55.907Z",
+    "createdAt": "2026-03-12T23:07:20.153Z",
+    "id": "1dYjVWNjO479N5aD",
+    "name": "daily-pipeline-digest",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "typeVersion": 1.2,
+            "id": "schedule-digest",
+            "name": "Schedule Trigger (Daily 23:30 KST)",
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "expression": "30 23 * * *",
+                            "field": "cronExpression"
+                        }
+                    ]
+                }
             },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
-          ]
+            "position": [
+                100,
+                200
+            ],
+            "type": "n8n-nodes-base.scheduleTrigger"
         },
-        "method": "GET",
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "select",
-              "value": "*"
+        {
+            "name": "Load Digest Window",
+            "parameters": {
+                "jsCode": "if (!$vars.DIGEST_LOOKBACK_HOURS) throw new Error('n8n Variable DIGEST_LOOKBACK_HOURS is not set.');\nconst hours = Number($vars.DIGEST_LOOKBACK_HOURS);\nif (isNaN(hours) || hours <= 0) throw new Error('DIGEST_LOOKBACK_HOURS must be a positive number.');\nconst since = new Date(Date.now() - hours * 3600 * 1000).toISOString();\nreturn { lookbackHours: hours, since };"
             },
-            {
-              "name": "created_at",
-              "value": "=gte.{{ $('Load Digest Window').first().json.since }}"
-            },
-            {
-              "name": "order",
-              "value": "created_at.desc"
+            "position": [
+                350,
+                200
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "load-window"
+        },
+        {
+            "position": [
+                620,
+                200
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "id": "query-commands",
+            "name": "Query Pipeline Commands",
+            "parameters": {
+                "sendHeaders": true,
+                "sendQuery": true,
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        }
+                    ]
+                },
+                "method": "GET",
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "select",
+                            "value": "*"
+                        },
+                        {
+                            "name": "created_at",
+                            "value": "=gte.{{ $('Load Digest Window').first().json.since }}"
+                        },
+                        {
+                            "name": "order",
+                            "value": "created_at.desc"
+                        }
+                    ]
+                }
             }
-          ]
+        },
+        {
+            "name": "Query System Status",
+            "parameters": {
+                "method": "GET",
+                "sendHeaders": true,
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                        }
+                    ]
+                }
+            },
+            "position": [
+                890,
+                200
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "id": "query-health"
+        },
+        {
+            "position": [
+                1160,
+                200
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "aggregate-digest",
+            "name": "Aggregate Digest",
+            "parameters": {
+                "jsCode": "const commands = $('Query Pipeline Commands').first().json;\nconst healthData = $input.first().json;\nconst rows = Array.isArray(commands) ? commands : (commands ? [commands] : []);\nconst healthRows = Array.isArray(healthData) ? healthData : (healthData ? [healthData] : []);\nconst window = $('Load Digest Window').first().json;\n\nconst total = rows.length;\nconst success = rows.filter(r => r.status === 'completed').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst timeout = rows.filter(r => r.status === 'cancelled').length;\nconst pending = rows.filter(r => r.status === 'pending' || r.status === 'processing').length;\n\nconst channelCounts = {};\nfor (const r of rows) {\n  const ch = r.channel || 'unknown';\n  if (!channelCounts[ch]) channelCounts[ch] = { total: 0, success: 0, failed: 0 };\n  channelCounts[ch].total++;\n  if (r.status === 'completed') channelCounts[ch].success++;\n  if (r.status === 'failed') channelCounts[ch].failed++;\n}\n\nconst youtubeIds = rows.filter(r => r.result?.youtube_id).map(r => r.result.youtube_id);\nconst unhealthyComponents = healthRows.filter(r => ['degraded', 'error', 'offline', 'unknown'].includes(r.status || 'unknown'));\n\nreturn {\n  lookbackHours: window.lookbackHours,\n  total, success, failed, timeout, pending,\n  channelSummary: channelCounts,\n  youtubeIds: youtubeIds.slice(0, 10),\n  unhealthyComponents: unhealthyComponents.length,\n  generatedAt: new Date().toISOString()\n};"
+            }
+        },
+        {
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "prepare-digest-slack",
+            "name": "Prepare Digest Slack Input",
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst channelLines = Object.entries(data.channelSummary).map(([ch, c]) => `${ch}: ${c.total} runs (${c.success}\u2705 ${c.failed}\u274c)`).join(', ');\nreturn {\n  notificationType: 'digest',\n  source: 'pipeline',\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  channelSummary: channelLines,\n  youtubeIds: data.youtubeIds.join(', '),\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
+            },
+            "position": [
+                1430,
+                200
+            ]
+        },
+        {
+            "position": [
+                1700,
+                200
+            ],
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.1,
+            "id": "notify-digest",
+            "name": "Notify via Slack",
+            "parameters": {
+                "source": "database",
+                "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+            }
+        },
+        {
+            "position": [
+                1970,
+                200
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "return-digest",
+            "name": "Return Digest Result",
+            "parameters": {
+                "jsCode": "const data = $('Aggregate Digest').first().json;\nreturn {\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
+            }
         }
-      }
+    ],
+    "connections": {
+        "Load Digest Window": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Query Pipeline Commands",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Notify via Slack": {
+            "main": [
+                [
+                    {
+                        "node": "Return Digest Result",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Digest Slack Input": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Notify via Slack",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Query Pipeline Commands": {
+            "main": [
+                [
+                    {
+                        "node": "Query System Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Query System Status": {
+            "main": [
+                [
+                    {
+                        "node": "Aggregate Digest",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Schedule Trigger (Daily 23:30 KST)": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Load Digest Window",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Aggregate Digest": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Prepare Digest Slack Input",
+                        "type": "main"
+                    }
+                ]
+            ]
+        }
     },
-    {
-      "name": "Query System Status",
-      "parameters": {
-        "method": "GET",
-        "sendHeaders": true,
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*",
-        "headerParameters": {
-          "parameters": [
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": {
+        "node:Schedule Trigger (Daily 23:30 KST)": {
+            "recurrenceRules": []
+        }
+    },
+    "meta": null,
+    "pinData": null,
+    "versionId": "85696965-4392-4029-a7b7-adb45c32a5ee",
+    "activeVersionId": "85696965-4392-4029-a7b7-adb45c32a5ee",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T23:07:20.153Z",
+            "createdAt": "2026-03-12T23:07:20.153Z",
+            "role": "workflow:owner",
+            "workflowId": "1dYjVWNjO479N5aD",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-12T23:07:20.155Z",
+        "createdAt": "2026-03-12T23:07:20.155Z",
+        "versionId": "85696965-4392-4029-a7b7-adb45c32a5ee",
+        "workflowId": "1dYjVWNjO479N5aD",
+        "nodes": [
             {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                "typeVersion": 1.2,
+                "id": "schedule-digest",
+                "name": "Schedule Trigger (Daily 23:30 KST)",
+                "parameters": {
+                    "rule": {
+                        "interval": [
+                            {
+                                "expression": "30 23 * * *",
+                                "field": "cronExpression"
+                            }
+                        ]
+                    }
+                },
+                "position": [
+                    100,
+                    200
+                ],
+                "type": "n8n-nodes-base.scheduleTrigger"
             },
             {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                "name": "Load Digest Window",
+                "parameters": {
+                    "jsCode": "if (!$vars.DIGEST_LOOKBACK_HOURS) throw new Error('n8n Variable DIGEST_LOOKBACK_HOURS is not set.');\nconst hours = Number($vars.DIGEST_LOOKBACK_HOURS);\nif (isNaN(hours) || hours <= 0) throw new Error('DIGEST_LOOKBACK_HOURS must be a positive number.');\nconst since = new Date(Date.now() - hours * 3600 * 1000).toISOString();\nreturn { lookbackHours: hours, since };"
+                },
+                "position": [
+                    350,
+                    200
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "load-window"
+            },
+            {
+                "position": [
+                    620,
+                    200
+                ],
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "id": "query-commands",
+                "name": "Query Pipeline Commands",
+                "parameters": {
+                    "sendHeaders": true,
+                    "sendQuery": true,
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/pipeline_commands",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            }
+                        ]
+                    },
+                    "method": "GET",
+                    "queryParameters": {
+                        "parameters": [
+                            {
+                                "name": "select",
+                                "value": "*"
+                            },
+                            {
+                                "name": "created_at",
+                                "value": "=gte.{{ $('Load Digest Window').first().json.since }}"
+                            },
+                            {
+                                "name": "order",
+                                "value": "created_at.desc"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Query System Status",
+                "parameters": {
+                    "method": "GET",
+                    "sendHeaders": true,
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+                            }
+                        ]
+                    }
+                },
+                "position": [
+                    890,
+                    200
+                ],
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "id": "query-health"
+            },
+            {
+                "position": [
+                    1160,
+                    200
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "aggregate-digest",
+                "name": "Aggregate Digest",
+                "parameters": {
+                    "jsCode": "const commands = $('Query Pipeline Commands').first().json;\nconst healthData = $input.first().json;\nconst rows = Array.isArray(commands) ? commands : (commands ? [commands] : []);\nconst healthRows = Array.isArray(healthData) ? healthData : (healthData ? [healthData] : []);\nconst window = $('Load Digest Window').first().json;\n\nconst total = rows.length;\nconst success = rows.filter(r => r.status === 'completed').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst timeout = rows.filter(r => r.status === 'cancelled').length;\nconst pending = rows.filter(r => r.status === 'pending' || r.status === 'processing').length;\n\nconst channelCounts = {};\nfor (const r of rows) {\n  const ch = r.channel || 'unknown';\n  if (!channelCounts[ch]) channelCounts[ch] = { total: 0, success: 0, failed: 0 };\n  channelCounts[ch].total++;\n  if (r.status === 'completed') channelCounts[ch].success++;\n  if (r.status === 'failed') channelCounts[ch].failed++;\n}\n\nconst youtubeIds = rows.filter(r => r.result?.youtube_id).map(r => r.result.youtube_id);\nconst unhealthyComponents = healthRows.filter(r => ['degraded', 'error', 'offline', 'unknown'].includes(r.status || 'unknown'));\n\nreturn {\n  lookbackHours: window.lookbackHours,\n  total, success, failed, timeout, pending,\n  channelSummary: channelCounts,\n  youtubeIds: youtubeIds.slice(0, 10),\n  unhealthyComponents: unhealthyComponents.length,\n  generatedAt: new Date().toISOString()\n};"
+                }
+            },
+            {
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "prepare-digest-slack",
+                "name": "Prepare Digest Slack Input",
+                "parameters": {
+                    "jsCode": "const data = $input.first().json;\nconst channelLines = Object.entries(data.channelSummary).map(([ch, c]) => `${ch}: ${c.total} runs (${c.success}\u2705 ${c.failed}\u274c)`).join(', ');\nreturn {\n  notificationType: 'digest',\n  source: 'pipeline',\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  channelSummary: channelLines,\n  youtubeIds: data.youtubeIds.join(', '),\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
+                },
+                "position": [
+                    1430,
+                    200
+                ]
+            },
+            {
+                "position": [
+                    1700,
+                    200
+                ],
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1.1,
+                "id": "notify-digest",
+                "name": "Notify via Slack",
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+                }
+            },
+            {
+                "position": [
+                    1970,
+                    200
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "return-digest",
+                "name": "Return Digest Result",
+                "parameters": {
+                    "jsCode": "const data = $('Aggregate Digest').first().json;\nreturn {\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
+                }
             }
-          ]
-        }
-      },
-      "position": [
-        890,
-        200
-      ],
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "query-health"
-    },
-    {
-      "position": [
-        1160,
-        200
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "aggregate-digest",
-      "name": "Aggregate Digest",
-      "parameters": {
-        "jsCode": "const commands = $('Query Pipeline Commands').first().json;\nconst healthData = $input.first().json;\nconst rows = Array.isArray(commands) ? commands : (commands ? [commands] : []);\nconst healthRows = Array.isArray(healthData) ? healthData : (healthData ? [healthData] : []);\nconst window = $('Load Digest Window').first().json;\n\nconst total = rows.length;\nconst success = rows.filter(r => r.status === 'completed').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst timeout = rows.filter(r => r.status === 'cancelled').length;\nconst pending = rows.filter(r => r.status === 'pending' || r.status === 'processing').length;\n\nconst channelCounts = {};\nfor (const r of rows) {\n  const ch = r.channel || 'unknown';\n  if (!channelCounts[ch]) channelCounts[ch] = { total: 0, success: 0, failed: 0 };\n  channelCounts[ch].total++;\n  if (r.status === 'completed') channelCounts[ch].success++;\n  if (r.status === 'failed') channelCounts[ch].failed++;\n}\n\nconst youtubeIds = rows.filter(r => r.result?.youtube_id).map(r => r.result.youtube_id);\nconst unhealthyComponents = healthRows.filter(r => ['degraded', 'error', 'offline', 'unknown'].includes(r.status || 'unknown'));\n\nreturn {\n  lookbackHours: window.lookbackHours,\n  total, success, failed, timeout, pending,\n  channelSummary: channelCounts,\n  youtubeIds: youtubeIds.slice(0, 10),\n  unhealthyComponents: unhealthyComponents.length,\n  generatedAt: new Date().toISOString()\n};"
-      }
-    },
-    {
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "prepare-digest-slack",
-      "name": "Prepare Digest Slack Input",
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst channelLines = Object.entries(data.channelSummary).map(([ch, c]) => `${ch}: ${c.total} runs (${c.success}✅ ${c.failed}❌)`).join(', ');\nreturn {\n  notificationType: 'digest',\n  source: 'pipeline',\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  channelSummary: channelLines,\n  youtubeIds: data.youtubeIds.join(', '),\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
-      },
-      "position": [
-        1430,
-        200
-      ]
-    },
-    {
-      "position": [
-        1700,
-        200
-      ],
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.1,
-      "id": "notify-digest",
-      "name": "Notify via Slack",
-      "parameters": {
-        "source": "database",
-        "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
-      }
-    },
-    {
-      "position": [
-        1970,
-        200
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "return-digest",
-      "name": "Return Digest Result",
-      "parameters": {
-        "jsCode": "const data = $('Aggregate Digest').first().json;\nreturn {\n  lookbackHours: data.lookbackHours,\n  totalRuns: data.total,\n  successCount: data.success,\n  failedCount: data.failed,\n  timeoutCount: data.timeout,\n  pendingCount: data.pending,\n  unhealthyComponents: data.unhealthyComponents,\n  generatedAt: data.generatedAt\n};"
-      }
+        ],
+        "connections": {
+            "Load Digest Window": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Query Pipeline Commands",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Notify via Slack": {
+                "main": [
+                    [
+                        {
+                            "node": "Return Digest Result",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Digest Slack Input": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Notify via Slack",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Query Pipeline Commands": {
+                "main": [
+                    [
+                        {
+                            "node": "Query System Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Query System Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Aggregate Digest",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Schedule Trigger (Daily 23:30 KST)": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Load Digest Window",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Aggregate Digest": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Prepare Digest Slack Input",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "JC Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-12T23:17:33.720Z",
+                "id": 15,
+                "workflowId": "1dYjVWNjO479N5aD",
+                "versionId": "85696965-4392-4029-a7b7-adb45c32a5ee",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        ]
     }
-  ],
-  "connections": {
-    "Load Digest Window": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Query Pipeline Commands",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Notify via Slack": {
-      "main": [
-        [
-          {
-            "node": "Return Digest Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Digest Slack Input": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Notify via Slack",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Query Pipeline Commands": {
-      "main": [
-        [
-          {
-            "node": "Query System Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Query System Status": {
-      "main": [
-        [
-          {
-            "node": "Aggregate Digest",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger (Daily 23:30 KST)": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Load Digest Window",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Aggregate Digest": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Prepare Digest Slack Input",
-            "type": "main"
-          }
-        ]
-      ]
-    }
-  },
-  "settings": {
-    "saveExecutionProgress": true,
-    "saveManualExecutions": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "executionTimeout": 3600,
-    "timezone": "UTC",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": {
-    "node:Schedule Trigger (Daily 23:30 KST)": {
-      "recurrenceRules": []
-    }
-  },
-  "meta": null,
-  "pinData": null,
-  "versionId": "85696965-4392-4029-a7b7-adb45c32a5ee",
-  "createdAt": "2026-03-12T23:07:20.153Z",
-  "updatedAt": "2026-03-12T23:16:55.907Z"
 }

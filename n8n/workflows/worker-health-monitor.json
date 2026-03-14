@@ -1,272 +1,560 @@
 {
-  "id": "T9lK5vTr9CGTwYrs",
-  "name": "worker-health-monitor",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "position": [
-        100,
-        200
-      ],
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "id": "schedule-health",
-      "name": "Schedule Trigger (Every 10 Minutes)",
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "*/10 * * * *"
+    "updatedAt": "2026-03-12T23:16:55.736Z",
+    "createdAt": "2026-03-12T23:06:53.427Z",
+    "id": "T9lK5vTr9CGTwYrs",
+    "name": "worker-health-monitor",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "position": [
+                100,
+                200
+            ],
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "id": "schedule-health",
+            "name": "Schedule Trigger (Every 10 Minutes)",
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "*/10 * * * *"
+                        }
+                    ]
+                }
             }
-          ]
+        },
+        {
+            "position": [
+                350,
+                200
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "load-policy",
+            "name": "Load Health Policy",
+            "parameters": {
+                "jsCode": "if (!$vars.HEALTH_STALE_MINUTES) throw new Error('n8n Variable HEALTH_STALE_MINUTES is not set.');\nconst staleMinutes = Number($vars.HEALTH_STALE_MINUTES);\nif (isNaN(staleMinutes) || staleMinutes <= 0) throw new Error('HEALTH_STALE_MINUTES must be a positive number.');\nreturn { staleMinutes, checkedAt: new Date().toISOString() };"
+            }
+        },
+        {
+            "position": [
+                620,
+                200
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "id": "query-status",
+            "name": "Query System Status",
+            "parameters": {
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                        },
+                        {
+                            "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}",
+                            "name": "Authorization"
+                        }
+                    ]
+                },
+                "method": "GET",
+                "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*"
+            }
+        },
+        {
+            "position": [
+                890,
+                200
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "evaluate-health",
+            "name": "Evaluate Health State",
+            "parameters": {
+                "jsCode": "const policy = $('Load Health Policy').first().json;\nconst response = $input.first().json;\nconst rows = Array.isArray(response) ? response : [response];\nconst now = new Date();\nconst staleMs = policy.staleMinutes * 60 * 1000;\nconst unhealthy = [];\nconst stale = [];\nfor (const row of rows) {\n  const status = row.status || 'unknown';\n  if (['degraded', 'error', 'offline', 'unknown'].includes(status)) {\n    unhealthy.push({ component: row.component || row.id, status, lastHeartbeat: row.last_heartbeat });\n  }\n  if (row.last_heartbeat) {\n    const age = now - new Date(row.last_heartbeat);\n    if (age > staleMs) {\n      stale.push({ component: row.component || row.id, lastHeartbeat: row.last_heartbeat, staleMinutes: Math.round(age / 60000) });\n    }\n  }\n}\nconst hasAlerts = unhealthy.length > 0 || stale.length > 0;\nreturn { hasAlerts, unhealthy, stale, checkedAt: policy.checkedAt, thresholdMinutes: policy.staleMinutes };"
+            }
+        },
+        {
+            "typeVersion": 2.1,
+            "id": "if-alert",
+            "name": "Any Alerts?",
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "caseSensitive": true
+                    },
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "operator": {
+                                "operation": "equals",
+                                "type": "boolean"
+                            },
+                            "rightValue": true,
+                            "id": "alert-check",
+                            "leftValue": "={{ $json.hasAlerts }}"
+                        }
+                    ]
+                }
+            },
+            "position": [
+                1160,
+                200
+            ],
+            "type": "n8n-nodes-base.if"
+        },
+        {
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "prepare-alert-slack",
+            "name": "Prepare Alert Slack Input",
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst components = [...data.unhealthy.map(c => `${c.component}: ${c.status}`), ...data.stale.map(c => `${c.component}: stale ${c.staleMinutes}m`)];\nreturn {\n  notificationType: 'alert',\n  source: 'system_status',\n  components: components.join(', '),\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+            },
+            "position": [
+                1430,
+                100
+            ]
+        },
+        {
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.1,
+            "id": "notify-alert",
+            "name": "Notify via Slack",
+            "parameters": {
+                "source": "database",
+                "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+            },
+            "position": [
+                1700,
+                100
+            ]
+        },
+        {
+            "name": "Return Alert Result",
+            "parameters": {
+                "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: true,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+            },
+            "position": [
+                1970,
+                100
+            ],
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "id": "return-alert"
+        },
+        {
+            "typeVersion": 2,
+            "id": "return-healthy",
+            "name": "Return Healthy Result",
+            "parameters": {
+                "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: false,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+            },
+            "position": [
+                1430,
+                320
+            ],
+            "type": "n8n-nodes-base.code"
         }
-      }
+    ],
+    "connections": {
+        "Any Alerts?": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Prepare Alert Slack Input",
+                        "type": "main"
+                    }
+                ],
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Return Healthy Result"
+                    }
+                ]
+            ]
+        },
+        "Evaluate Health State": {
+            "main": [
+                [
+                    {
+                        "node": "Any Alerts?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Load Health Policy": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Query System Status"
+                    }
+                ]
+            ]
+        },
+        "Notify via Slack": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Return Alert Result",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Prepare Alert Slack Input": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Notify via Slack",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Query System Status": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Evaluate Health State",
+                        "type": "main"
+                    }
+                ]
+            ]
+        },
+        "Schedule Trigger (Every 10 Minutes)": {
+            "main": [
+                [
+                    {
+                        "node": "Load Health Policy",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
     },
-    {
-      "position": [
-        350,
-        200
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "load-policy",
-      "name": "Load Health Policy",
-      "parameters": {
-        "jsCode": "if (!$vars.HEALTH_STALE_MINUTES) throw new Error('n8n Variable HEALTH_STALE_MINUTES is not set.');\nconst staleMinutes = Number($vars.HEALTH_STALE_MINUTES);\nif (isNaN(staleMinutes) || staleMinutes <= 0) throw new Error('HEALTH_STALE_MINUTES must be a positive number.');\nreturn { staleMinutes, checkedAt: new Date().toISOString() };"
-      }
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
     },
-    {
-      "position": [
-        620,
-        200
-      ],
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "query-status",
-      "name": "Query System Status",
-      "parameters": {
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+    "staticData": {
+        "node:Schedule Trigger (Every 10 Minutes)": {
+            "recurrenceRules": []
+        }
+    },
+    "meta": null,
+    "pinData": null,
+    "versionId": "8f4fb1b4-f5c5-4a3b-a04f-acf1615cac78",
+    "activeVersionId": "8f4fb1b4-f5c5-4a3b-a04f-acf1615cac78",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T23:06:53.427Z",
+            "createdAt": "2026-03-12T23:06:53.427Z",
+            "role": "workflow:owner",
+            "workflowId": "T9lK5vTr9CGTwYrs",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-12T23:06:53.430Z",
+        "createdAt": "2026-03-12T23:06:53.430Z",
+        "versionId": "8f4fb1b4-f5c5-4a3b-a04f-acf1615cac78",
+        "workflowId": "T9lK5vTr9CGTwYrs",
+        "nodes": [
             {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                "position": [
+                    100,
+                    200
+                ],
+                "type": "n8n-nodes-base.scheduleTrigger",
+                "typeVersion": 1.2,
+                "id": "schedule-health",
+                "name": "Schedule Trigger (Every 10 Minutes)",
+                "parameters": {
+                    "rule": {
+                        "interval": [
+                            {
+                                "field": "cronExpression",
+                                "expression": "*/10 * * * *"
+                            }
+                        ]
+                    }
+                }
             },
             {
-              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}",
-              "name": "Authorization"
-            }
-          ]
-        },
-        "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*"
-      }
-    },
-    {
-      "position": [
-        890,
-        200
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "evaluate-health",
-      "name": "Evaluate Health State",
-      "parameters": {
-        "jsCode": "const policy = $('Load Health Policy').first().json;\nconst response = $input.first().json;\nconst rows = Array.isArray(response) ? response : [response];\nconst now = new Date();\nconst staleMs = policy.staleMinutes * 60 * 1000;\nconst unhealthy = [];\nconst stale = [];\nfor (const row of rows) {\n  const status = row.status || 'unknown';\n  if (['degraded', 'error', 'offline', 'unknown'].includes(status)) {\n    unhealthy.push({ component: row.component || row.id, status, lastHeartbeat: row.last_heartbeat });\n  }\n  if (row.last_heartbeat) {\n    const age = now - new Date(row.last_heartbeat);\n    if (age > staleMs) {\n      stale.push({ component: row.component || row.id, lastHeartbeat: row.last_heartbeat, staleMinutes: Math.round(age / 60000) });\n    }\n  }\n}\nconst hasAlerts = unhealthy.length > 0 || stale.length > 0;\nreturn { hasAlerts, unhealthy, stale, checkedAt: policy.checkedAt, thresholdMinutes: policy.staleMinutes };"
-      }
-    },
-    {
-      "typeVersion": 2.1,
-      "id": "if-alert",
-      "name": "Any Alerts?",
-      "parameters": {
-        "conditions": {
-          "options": {
-            "leftValue": "",
-            "typeValidation": "strict",
-            "caseSensitive": true
-          },
-          "combinator": "and",
-          "conditions": [
+                "position": [
+                    350,
+                    200
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "load-policy",
+                "name": "Load Health Policy",
+                "parameters": {
+                    "jsCode": "if (!$vars.HEALTH_STALE_MINUTES) throw new Error('n8n Variable HEALTH_STALE_MINUTES is not set.');\nconst staleMinutes = Number($vars.HEALTH_STALE_MINUTES);\nif (isNaN(staleMinutes) || staleMinutes <= 0) throw new Error('HEALTH_STALE_MINUTES must be a positive number.');\nreturn { staleMinutes, checkedAt: new Date().toISOString() };"
+                }
+            },
             {
-              "operator": {
-                "operation": "equals",
-                "type": "boolean"
-              },
-              "rightValue": true,
-              "id": "alert-check",
-              "leftValue": "={{ $json.hasAlerts }}"
+                "position": [
+                    620,
+                    200
+                ],
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "id": "query-status",
+                "name": "Query System Status",
+                "parameters": {
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "apikey",
+                                "value": "={{ $env.SUPABASE_ANON_KEY }}"
+                            },
+                            {
+                                "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}",
+                                "name": "Authorization"
+                            }
+                        ]
+                    },
+                    "method": "GET",
+                    "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_status?select=*"
+                }
+            },
+            {
+                "position": [
+                    890,
+                    200
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "evaluate-health",
+                "name": "Evaluate Health State",
+                "parameters": {
+                    "jsCode": "const policy = $('Load Health Policy').first().json;\nconst response = $input.first().json;\nconst rows = Array.isArray(response) ? response : [response];\nconst now = new Date();\nconst staleMs = policy.staleMinutes * 60 * 1000;\nconst unhealthy = [];\nconst stale = [];\nfor (const row of rows) {\n  const status = row.status || 'unknown';\n  if (['degraded', 'error', 'offline', 'unknown'].includes(status)) {\n    unhealthy.push({ component: row.component || row.id, status, lastHeartbeat: row.last_heartbeat });\n  }\n  if (row.last_heartbeat) {\n    const age = now - new Date(row.last_heartbeat);\n    if (age > staleMs) {\n      stale.push({ component: row.component || row.id, lastHeartbeat: row.last_heartbeat, staleMinutes: Math.round(age / 60000) });\n    }\n  }\n}\nconst hasAlerts = unhealthy.length > 0 || stale.length > 0;\nreturn { hasAlerts, unhealthy, stale, checkedAt: policy.checkedAt, thresholdMinutes: policy.staleMinutes };"
+                }
+            },
+            {
+                "typeVersion": 2.1,
+                "id": "if-alert",
+                "name": "Any Alerts?",
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "leftValue": "",
+                            "typeValidation": "strict",
+                            "caseSensitive": true
+                        },
+                        "combinator": "and",
+                        "conditions": [
+                            {
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "boolean"
+                                },
+                                "rightValue": true,
+                                "id": "alert-check",
+                                "leftValue": "={{ $json.hasAlerts }}"
+                            }
+                        ]
+                    }
+                },
+                "position": [
+                    1160,
+                    200
+                ],
+                "type": "n8n-nodes-base.if"
+            },
+            {
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "prepare-alert-slack",
+                "name": "Prepare Alert Slack Input",
+                "parameters": {
+                    "jsCode": "const data = $input.first().json;\nconst components = [...data.unhealthy.map(c => `${c.component}: ${c.status}`), ...data.stale.map(c => `${c.component}: stale ${c.staleMinutes}m`)];\nreturn {\n  notificationType: 'alert',\n  source: 'system_status',\n  components: components.join(', '),\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+                },
+                "position": [
+                    1430,
+                    100
+                ]
+            },
+            {
+                "type": "n8n-nodes-base.executeWorkflow",
+                "typeVersion": 1.1,
+                "id": "notify-alert",
+                "name": "Notify via Slack",
+                "parameters": {
+                    "source": "database",
+                    "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
+                },
+                "position": [
+                    1700,
+                    100
+                ]
+            },
+            {
+                "name": "Return Alert Result",
+                "parameters": {
+                    "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: true,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+                },
+                "position": [
+                    1970,
+                    100
+                ],
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "id": "return-alert"
+            },
+            {
+                "typeVersion": 2,
+                "id": "return-healthy",
+                "name": "Return Healthy Result",
+                "parameters": {
+                    "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: false,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
+                },
+                "position": [
+                    1430,
+                    320
+                ],
+                "type": "n8n-nodes-base.code"
             }
-          ]
-        }
-      },
-      "position": [
-        1160,
-        200
-      ],
-      "type": "n8n-nodes-base.if"
-    },
-    {
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "prepare-alert-slack",
-      "name": "Prepare Alert Slack Input",
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst components = [...data.unhealthy.map(c => `${c.component}: ${c.status}`), ...data.stale.map(c => `${c.component}: stale ${c.staleMinutes}m`)];\nreturn {\n  notificationType: 'alert',\n  source: 'system_status',\n  components: components.join(', '),\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
-      },
-      "position": [
-        1430,
-        100
-      ]
-    },
-    {
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.1,
-      "id": "notify-alert",
-      "name": "Notify via Slack",
-      "parameters": {
-        "source": "database",
-        "workflowId": "={{ $env.SLACK_NOTIFIER_WORKFLOW_ID }}"
-      },
-      "position": [
-        1700,
-        100
-      ]
-    },
-    {
-      "name": "Return Alert Result",
-      "parameters": {
-        "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: true,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
-      },
-      "position": [
-        1970,
-        100
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "id": "return-alert"
-    },
-    {
-      "typeVersion": 2,
-      "id": "return-healthy",
-      "name": "Return Healthy Result",
-      "parameters": {
-        "jsCode": "const data = $('Evaluate Health State').first().json;\nreturn {\n  hasAlerts: false,\n  unhealthyCount: data.unhealthy.length,\n  staleCount: data.stale.length,\n  thresholdMinutes: data.thresholdMinutes,\n  checkedAt: data.checkedAt\n};"
-      },
-      "position": [
-        1430,
-        320
-      ],
-      "type": "n8n-nodes-base.code"
-    }
-  ],
-  "connections": {
-    "Any Alerts?": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Prepare Alert Slack Input",
-            "type": "main"
-          }
         ],
-        [
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Return Healthy Result"
-          }
+        "connections": {
+            "Any Alerts?": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Prepare Alert Slack Input",
+                            "type": "main"
+                        }
+                    ],
+                    [
+                        {
+                            "type": "main",
+                            "index": 0,
+                            "node": "Return Healthy Result"
+                        }
+                    ]
+                ]
+            },
+            "Evaluate Health State": {
+                "main": [
+                    [
+                        {
+                            "node": "Any Alerts?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Load Health Policy": {
+                "main": [
+                    [
+                        {
+                            "type": "main",
+                            "index": 0,
+                            "node": "Query System Status"
+                        }
+                    ]
+                ]
+            },
+            "Notify via Slack": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Return Alert Result",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Prepare Alert Slack Input": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Notify via Slack",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Query System Status": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Evaluate Health State",
+                            "type": "main"
+                        }
+                    ]
+                ]
+            },
+            "Schedule Trigger (Every 10 Minutes)": {
+                "main": [
+                    [
+                        {
+                            "node": "Load Health Policy",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "JC Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-12T23:17:32.821Z",
+                "id": 14,
+                "workflowId": "T9lK5vTr9CGTwYrs",
+                "versionId": "8f4fb1b4-f5c5-4a3b-a04f-acf1615cac78",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
-    },
-    "Evaluate Health State": {
-      "main": [
-        [
-          {
-            "node": "Any Alerts?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Health Policy": {
-      "main": [
-        [
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Query System Status"
-          }
-        ]
-      ]
-    },
-    "Notify via Slack": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Return Alert Result",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Prepare Alert Slack Input": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Notify via Slack",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Query System Status": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Evaluate Health State",
-            "type": "main"
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger (Every 10 Minutes)": {
-      "main": [
-        [
-          {
-            "node": "Load Health Policy",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
-  },
-  "settings": {
-    "saveExecutionProgress": true,
-    "saveManualExecutions": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "executionTimeout": 3600,
-    "timezone": "UTC",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": {
-    "node:Schedule Trigger (Every 10 Minutes)": {
-      "recurrenceRules": []
-    }
-  },
-  "meta": null,
-  "pinData": null,
-  "versionId": "8f4fb1b4-f5c5-4a3b-a04f-acf1615cac78",
-  "createdAt": "2026-03-12T23:06:53.427Z",
-  "updatedAt": "2026-03-12T23:16:55.736Z"
 }

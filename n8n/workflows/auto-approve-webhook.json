@@ -1,245 +1,510 @@
 {
-  "id": "TXPmooBreuX2oCw4",
-  "name": "Auto-Approve Webhook",
-  "description": null,
-  "active": true,
-  "isArchived": false,
-  "nodes": [
-    {
-      "parameters": {
-        "path": "github-auto-approve",
-        "responseMode": "onReceived",
-        "httpMethod": "POST",
-        "options": {}
-      },
-      "position": [
-        250,
-        300
-      ],
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "webhookId": "c8f4a2b3-5d6e-7f8a-9b0c-1d2e3f4a5b6c",
-      "id": "webhook-approve",
-      "name": "GitHub Workflow Run Webhook"
-    },
-    {
-      "name": "Needs Approval",
-      "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ $json.body.action }}",
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              },
-              "rightValue": "action_required",
-              "id": "cond1"
+    "updatedAt": "2026-03-12T17:12:12.887Z",
+    "createdAt": "2026-03-12T17:12:12.887Z",
+    "id": "TXPmooBreuX2oCw4",
+    "name": "Auto-Approve Webhook",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "path": "github-auto-approve",
+                "responseMode": "onReceived",
+                "httpMethod": "POST",
+                "options": {}
             },
-            {
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              },
-              "rightValue": "action_required",
-              "id": "cond2",
-              "leftValue": "={{ $json.body.workflow_run.status }}"
-            }
-          ],
-          "options": {
-            "caseSensitive": false
-          },
-          "combinator": "or"
+            "position": [
+                250,
+                300
+            ],
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "webhookId": "c8f4a2b3-5d6e-7f8a-9b0c-1d2e3f4a5b6c",
+            "id": "webhook-approve",
+            "name": "GitHub Workflow Run Webhook"
         },
-        "options": {}
-      },
-      "position": [
-        500,
-        300
-      ],
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "id": "check-action"
-    },
-    {
-      "name": "Is Trusted Actor",
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false
-          },
-          "combinator": "or",
-          "conditions": [
-            {
-              "rightValue": "dependabot[bot]",
-              "id": "cond1",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
+        {
+            "name": "Needs Approval",
+            "parameters": {
+                "conditions": {
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.body.action }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            },
+                            "rightValue": "action_required",
+                            "id": "cond1"
+                        },
+                        {
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            },
+                            "rightValue": "action_required",
+                            "id": "cond2",
+                            "leftValue": "={{ $json.body.workflow_run.status }}"
+                        }
+                    ],
+                    "options": {
+                        "caseSensitive": false
+                    },
+                    "combinator": "or"
+                },
+                "options": {}
             },
-            {
-              "id": "cond2",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "rightValue": "github-actions[bot]"
-            },
-            {
-              "rightValue": "chatgpt-codex-connector[bot]",
-              "id": "cond3",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            },
-            {
-              "rightValue": "openai-code-agent[bot]",
-              "id": "cond4",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              }
-            },
-            {
-              "rightValue": "codex[bot]",
-              "id": "cond5",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              }
-            },
-            {
-              "rightValue": "Codex",
-              "id": "cond6",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              }
-            },
-            {
-              "id": "cond7",
-              "leftValue": "={{ $json.body.workflow_run.actor.login }}",
-              "operator": {
-                "operation": "equals",
-                "type": "string"
-              },
-              "rightValue": "qws941"
-            }
-          ]
+            "position": [
+                500,
+                300
+            ],
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "id": "check-action"
         },
-        "options": {}
-      },
-      "position": [
-        750,
-        250
-      ],
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "id": "check-actor"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1
-            }
-          },
-          "response": {
-            "response": {
-              "responseFormat": "text"
-            }
-          }
+        {
+            "name": "Is Trusted Actor",
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": false
+                    },
+                    "combinator": "or",
+                    "conditions": [
+                        {
+                            "rightValue": "dependabot[bot]",
+                            "id": "cond1",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        },
+                        {
+                            "id": "cond2",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            },
+                            "rightValue": "github-actions[bot]"
+                        },
+                        {
+                            "rightValue": "chatgpt-codex-connector[bot]",
+                            "id": "cond3",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        },
+                        {
+                            "rightValue": "openai-code-agent[bot]",
+                            "id": "cond4",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "rightValue": "codex[bot]",
+                            "id": "cond5",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "rightValue": "Codex",
+                            "id": "cond6",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "id": "cond7",
+                            "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            },
+                            "rightValue": "qws941"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "position": [
+                750,
+                250
+            ],
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "id": "check-actor"
         },
-        "sendHeaders": true,
-        "url": "=https://api.github.com/repos/{{ $json.body.repository.full_name }}/actions/runs/{{ $json.body.workflow_run.id }}/approve",
-        "headerParameters": {
-          "parameters": [
-            {
-              "value": "=Bearer {{ $env.GITHUB_PAT }}",
-              "name": "Authorization"
+        {
+            "parameters": {
+                "method": "POST",
+                "options": {
+                    "batching": {
+                        "batch": {
+                            "batchSize": 1
+                        }
+                    },
+                    "response": {
+                        "response": {
+                            "responseFormat": "text"
+                        }
+                    }
+                },
+                "sendHeaders": true,
+                "url": "=https://api.github.com/repos/{{ $json.body.repository.full_name }}/actions/runs/{{ $json.body.workflow_run.id }}/approve",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "value": "=Bearer {{ $env.GITHUB_PAT }}",
+                            "name": "Authorization"
+                        },
+                        {
+                            "name": "Accept",
+                            "value": "application/vnd.github+json"
+                        },
+                        {
+                            "value": "2022-11-28",
+                            "name": "X-GitHub-Api-Version"
+                        }
+                    ]
+                }
             },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github+json"
-            },
-            {
-              "value": "2022-11-28",
-              "name": "X-GitHub-Api-Version"
-            }
-          ]
+            "position": [
+                1000,
+                200
+            ],
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "id": "approve-run",
+            "name": "Approve Run"
         }
-      },
-      "position": [
-        1000,
-        200
-      ],
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "id": "approve-run",
-      "name": "Approve Run"
-    }
-  ],
-  "connections": {
-    "GitHub Workflow Run Webhook": {
-      "main": [
-        [
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Needs Approval"
-          }
+    ],
+    "connections": {
+        "GitHub Workflow Run Webhook": {
+            "main": [
+                [
+                    {
+                        "type": "main",
+                        "index": 0,
+                        "node": "Needs Approval"
+                    }
+                ]
+            ]
+        },
+        "Needs Approval": {
+            "main": [
+                [
+                    {
+                        "node": "Is Trusted Actor",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Is Trusted Actor": {
+            "main": [
+                [
+                    {
+                        "index": 0,
+                        "node": "Approve Run",
+                        "type": "main"
+                    }
+                ],
+                []
+            ]
+        }
+    },
+    "settings": {
+        "saveExecutionProgress": true,
+        "saveManualExecutions": true,
+        "saveDataErrorExecution": "all",
+        "saveDataSuccessExecution": "all",
+        "executionTimeout": 3600,
+        "timezone": "UTC",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "2f27999d-3e0e-4243-8cbf-33af7e166e26",
+    "activeVersionId": "2f27999d-3e0e-4243-8cbf-33af7e166e26",
+    "versionCounter": 6,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-12T17:12:12.887Z",
+            "createdAt": "2026-03-12T17:12:12.887Z",
+            "role": "workflow:owner",
+            "workflowId": "TXPmooBreuX2oCw4",
+            "projectId": "zHsUy9n7V6UwMbDk",
+            "project": {
+                "updatedAt": "2026-03-13T00:15:47.965Z",
+                "createdAt": "2026-03-12T15:49:43.032Z",
+                "id": "zHsUy9n7V6UwMbDk",
+                "name": "Admin Lee <admin@jclee.me>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-12T17:12:12.890Z",
+        "createdAt": "2026-03-12T17:12:12.890Z",
+        "versionId": "2f27999d-3e0e-4243-8cbf-33af7e166e26",
+        "workflowId": "TXPmooBreuX2oCw4",
+        "nodes": [
+            {
+                "parameters": {
+                    "path": "github-auto-approve",
+                    "responseMode": "onReceived",
+                    "httpMethod": "POST",
+                    "options": {}
+                },
+                "position": [
+                    250,
+                    300
+                ],
+                "type": "n8n-nodes-base.webhook",
+                "typeVersion": 2,
+                "webhookId": "c8f4a2b3-5d6e-7f8a-9b0c-1d2e3f4a5b6c",
+                "id": "webhook-approve",
+                "name": "GitHub Workflow Run Webhook"
+            },
+            {
+                "name": "Needs Approval",
+                "parameters": {
+                    "conditions": {
+                        "conditions": [
+                            {
+                                "leftValue": "={{ $json.body.action }}",
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                },
+                                "rightValue": "action_required",
+                                "id": "cond1"
+                            },
+                            {
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                },
+                                "rightValue": "action_required",
+                                "id": "cond2",
+                                "leftValue": "={{ $json.body.workflow_run.status }}"
+                            }
+                        ],
+                        "options": {
+                            "caseSensitive": false
+                        },
+                        "combinator": "or"
+                    },
+                    "options": {}
+                },
+                "position": [
+                    500,
+                    300
+                ],
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2,
+                "id": "check-action"
+            },
+            {
+                "name": "Is Trusted Actor",
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": false
+                        },
+                        "combinator": "or",
+                        "conditions": [
+                            {
+                                "rightValue": "dependabot[bot]",
+                                "id": "cond1",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "type": "string",
+                                    "operation": "equals"
+                                }
+                            },
+                            {
+                                "id": "cond2",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "type": "string",
+                                    "operation": "equals"
+                                },
+                                "rightValue": "github-actions[bot]"
+                            },
+                            {
+                                "rightValue": "chatgpt-codex-connector[bot]",
+                                "id": "cond3",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "type": "string",
+                                    "operation": "equals"
+                                }
+                            },
+                            {
+                                "rightValue": "openai-code-agent[bot]",
+                                "id": "cond4",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                }
+                            },
+                            {
+                                "rightValue": "codex[bot]",
+                                "id": "cond5",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                }
+                            },
+                            {
+                                "rightValue": "Codex",
+                                "id": "cond6",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                }
+                            },
+                            {
+                                "id": "cond7",
+                                "leftValue": "={{ $json.body.workflow_run.actor.login }}",
+                                "operator": {
+                                    "operation": "equals",
+                                    "type": "string"
+                                },
+                                "rightValue": "qws941"
+                            }
+                        ]
+                    },
+                    "options": {}
+                },
+                "position": [
+                    750,
+                    250
+                ],
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2,
+                "id": "check-actor"
+            },
+            {
+                "parameters": {
+                    "method": "POST",
+                    "options": {
+                        "batching": {
+                            "batch": {
+                                "batchSize": 1
+                            }
+                        },
+                        "response": {
+                            "response": {
+                                "responseFormat": "text"
+                            }
+                        }
+                    },
+                    "sendHeaders": true,
+                    "url": "=https://api.github.com/repos/{{ $json.body.repository.full_name }}/actions/runs/{{ $json.body.workflow_run.id }}/approve",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "value": "=Bearer {{ $env.GITHUB_PAT }}",
+                                "name": "Authorization"
+                            },
+                            {
+                                "name": "Accept",
+                                "value": "application/vnd.github+json"
+                            },
+                            {
+                                "value": "2022-11-28",
+                                "name": "X-GitHub-Api-Version"
+                            }
+                        ]
+                    }
+                },
+                "position": [
+                    1000,
+                    200
+                ],
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "id": "approve-run",
+                "name": "Approve Run"
+            }
+        ],
+        "connections": {
+            "GitHub Workflow Run Webhook": {
+                "main": [
+                    [
+                        {
+                            "type": "main",
+                            "index": 0,
+                            "node": "Needs Approval"
+                        }
+                    ]
+                ]
+            },
+            "Needs Approval": {
+                "main": [
+                    [
+                        {
+                            "node": "Is Trusted Actor",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    []
+                ]
+            },
+            "Is Trusted Actor": {
+                "main": [
+                    [
+                        {
+                            "index": 0,
+                            "node": "Approve Run",
+                            "type": "main"
+                        }
+                    ],
+                    []
+                ]
+            }
+        },
+        "authors": "JC Lee",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-12T17:19:20.235Z",
+                "id": 2,
+                "workflowId": "TXPmooBreuX2oCw4",
+                "versionId": "2f27999d-3e0e-4243-8cbf-33af7e166e26",
+                "event": "activated",
+                "userId": "13a95845-a46a-4855-b706-eadada0dd04c"
+            }
         ]
-      ]
-    },
-    "Needs Approval": {
-      "main": [
-        [
-          {
-            "node": "Is Trusted Actor",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Is Trusted Actor": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Approve Run",
-            "type": "main"
-          }
-        ],
-        []
-      ]
     }
-  },
-  "settings": {
-    "saveExecutionProgress": true,
-    "saveManualExecutions": true,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "executionTimeout": 3600,
-    "timezone": "UTC",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": null,
-  "meta": null,
-  "pinData": null,
-  "versionId": "2f27999d-3e0e-4243-8cbf-33af7e166e26",
-  "createdAt": "2026-03-12T17:12:12.887Z",
-  "updatedAt": "2026-03-12T17:12:12.887Z"
 }
