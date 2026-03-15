@@ -41,7 +41,7 @@ jobs:
               issue_number: issueNumber,
             });
 
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
@@ -105,14 +105,17 @@ jobs:
             if (eventType === 'opencode.task.started') {
               commentBody = makeCommentBody('🔧 **OpenCode Task Started**', [message]);
               await addLabelIfMissing(String(payload.status_label || 'status:in-progress'));
+              await removeLabelIfPresent('status:blocked');
             } else if (eventType === 'opencode.task.progress') {
               commentBody = makeCommentBody('📊 **OpenCode Progress Update**', [message]);
             } else if (eventType === 'opencode.task.blocked') {
               commentBody = makeCommentBody('🚫 **OpenCode Task Blocked**', [message]);
               await addLabelIfMissing(String(payload.status_label || 'status:blocked'));
+              await removeLabelIfPresent('status:in-progress');
             } else if (eventType === 'opencode.task.done') {
               commentBody = makeCommentBody('✅ **OpenCode Task Completed**', [message]);
               await removeLabelIfPresent('status:in-progress');
+              await removeLabelIfPresent('status:blocked');
             } else if (eventType === 'opencode.pr.created') {
               const prUrl = String(payload.pr_url || '').trim();
               commentBody = makeCommentBody('🔀 **PR Created by OpenCode**', [
