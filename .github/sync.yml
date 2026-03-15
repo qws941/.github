@@ -89,7 +89,6 @@ group:
       - source: .github/workflows/welcome.yml
         dest: .github/workflows/welcome.yml
     repos: |
-      qws941/aimo3-prize
       qws941/blacklist
       qws941/hycu
       qws941/hycu_fsds
@@ -98,7 +97,6 @@ group:
       qws941/qws941
       qws941/resume
       qws941/safetywallet
-      qws941/slack-opencode-bridge
       qws941/splunk
       qws941/terraform
       qws941/tmux
