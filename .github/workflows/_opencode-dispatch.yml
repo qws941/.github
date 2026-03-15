@@ -1,0 +1,81 @@
+name: OpenCode Dispatch (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      event_type:
+        required: true
+        type: string
+      payload:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01c0a04d569228b84ad0a1 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Dispatch OpenCode event
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          BRIDGE_TOKEN: ${{ secrets.OPENCODE_BRIDGE_TOKEN }}
+          BRIDGE_URL: ${{ vars.OPENCODE_BRIDGE_URL }}
+          RAW_PAYLOAD: ${{ inputs.payload }}
+        with:
+          script: |
+            const crypto = require('crypto');
+
+            if (!process.env.BRIDGE_TOKEN || !process.env.BRIDGE_URL) {
+              core.notice('OpenCode bridge not configured — skipping dispatch');
+              return;
+            }
+
+            let inputPayload;
+            try {
+              inputPayload = JSON.parse(process.env.RAW_PAYLOAD);
+            } catch (error) {
+              core.setFailed(`Invalid payload JSON: ${error.message}`);
+              return;
+            }
+
+            const payload = {
+              event_type: '${{ inputs.event_type }}',
+              repo: context.repo.owner + '/' + context.repo.repo,
+              sender: context.actor,
+              timestamp: new Date().toISOString(),
+              ...inputPayload,
+            };
+
+            const body = JSON.stringify(payload);
+            const hmac = crypto.createHmac('sha256', process.env.BRIDGE_TOKEN).update(body).digest('hex');
+            const deliveryId = crypto.randomUUID();
+
+            const response = await fetch(process.env.BRIDGE_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-GitHub-Event': 'opencode-dispatch',
+                'X-Hub-Signature-256': `sha256=${hmac}`,
+                'X-GitHub-Delivery': deliveryId,
+              },
+              body,
+            });
+
+            const responseBody = await response.text();
+            if (!response.ok) {
+              core.setFailed(`OpenCode dispatch failed (${response.status}): ${responseBody.slice(0, 500)}`);
+              return;
+            }
+
+            core.info(`OpenCode dispatch succeeded (${response.status}) delivery=${deliveryId}`);
+            if (responseBody) {
+              core.info(`OpenCode bridge response: ${responseBody.slice(0, 500)}`);
+            }

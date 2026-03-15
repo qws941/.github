@@ -1,0 +1,133 @@
+name: OpenCode Writeback (Reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  writeback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01c0a04d569228b84ad0a1 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Write back OpenCode status to issue
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const payload = context.payload.client_payload || {};
+            const eventType = payload.event_type;
+            const issueNumber = Number(payload.issue_number);
+
+            if (!eventType || !Number.isInteger(issueNumber) || issueNumber <= 0) {
+              core.setFailed('Invalid payload');
+              return;
+            }
+
+            const correlationId = String(payload.correlation_id || 'none');
+            const markerPrefix = `<!-- opencode:event=${eventType}:correlation=${correlationId}:run=`;
+            const marker = `${markerPrefix}${context.runId} -->`;
+            const message = String(payload.message || '').trim() || 'No additional details provided.';
+
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const alreadyProcessed = comments.some((comment) =>
+              typeof comment.body === 'string' && comment.body.includes(markerPrefix)
+            );
+
+            if (alreadyProcessed) {
+              core.notice('Already processed');
+              return;
+            }
+
+            const issueLabels = new Set((issue.labels || []).map((label) => label.name));
+
+            const addLabelIfMissing = async (name) => {
+              if (!name || issueLabels.has(name)) return;
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: [name],
+                });
+              } catch (error) {
+                core.notice(`Skipping label add '${name}': ${error.message}`);
+              }
+            };
+
+            const removeLabelIfPresent = async (name) => {
+              if (!name || !issueLabels.has(name)) return;
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name,
+                });
+              } catch (error) {
+                core.notice(`Skipping label remove '${name}': ${error.message}`);
+              }
+            };
+
+            const makeCommentBody = (title, bodyLines) => {
+              const detailLines = [
+                `${title}`,
+                '',
+                ...bodyLines,
+                '',
+                `Event: ${eventType}`,
+                `Correlation: ${correlationId}`,
+                '',
+                marker,
+              ];
+              return detailLines.join('\n');
+            };
+
+            let commentBody;
+            if (eventType === 'opencode.task.started') {
+              commentBody = makeCommentBody('🔧 **OpenCode Task Started**', [message]);
+              await addLabelIfMissing(String(payload.status_label || 'status:in-progress'));
+            } else if (eventType === 'opencode.task.progress') {
+              commentBody = makeCommentBody('📊 **OpenCode Progress Update**', [message]);
+            } else if (eventType === 'opencode.task.blocked') {
+              commentBody = makeCommentBody('🚫 **OpenCode Task Blocked**', [message]);
+              await addLabelIfMissing(String(payload.status_label || 'status:blocked'));
+            } else if (eventType === 'opencode.task.done') {
+              commentBody = makeCommentBody('✅ **OpenCode Task Completed**', [message]);
+              await removeLabelIfPresent('status:in-progress');
+            } else if (eventType === 'opencode.pr.created') {
+              const prUrl = String(payload.pr_url || '').trim();
+              commentBody = makeCommentBody('🔀 **PR Created by OpenCode**', [
+                `PR: ${prUrl || '(not provided)'}`,
+                '',
+                message,
+              ]);
+            } else {
+              core.notice(`Unsupported event_type '${eventType}'`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: commentBody,
+            });

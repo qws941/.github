@@ -86,6 +86,12 @@ group:
         dest: .github/workflows/labeler.yml
       - source: .github/workflows/lock-threads.yml
         dest: .github/workflows/lock-threads.yml
+      - source: .github/workflows/opencode-issue-sync.yml
+        dest: .github/workflows/opencode-issue-sync.yml
+      - source: .github/workflows/opencode-pr-sync.yml
+        dest: .github/workflows/opencode-pr-sync.yml
+      - source: .github/workflows/opencode-writeback.yml
+        dest: .github/workflows/opencode-writeback.yml
       - source: .github/workflows/pr-size.yml
         dest: .github/workflows/pr-size.yml
       - source: .github/workflows/release-drafter.yml
