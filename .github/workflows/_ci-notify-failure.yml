@@ -90,9 +90,9 @@ jobs:
             const familyPrefix = inputPrefix || ('[' + workflowName + ']');
             const familyMarker = `<!-- ci-notify-failure:workflow=${workflowName} -->`;
 
-            // Determine if this is a healthy (success) or unhealthy conclusion
+            // Determine if this is a recovery (success) or unhealthy conclusion
             const unhealthyConclusions = ['failure', 'timed_out', 'action_required', 'cancelled'];
-            const isHealthy = !unhealthyConclusions.includes(rawConclusion);
+            const isRecovery = rawConclusion === 'success';
 
             // Find existing open issues for this workflow family
             const { data: existingIssues } = await github.rest.issues.listForRepo({
@@ -111,8 +111,8 @@ jobs:
               return issue.title.startsWith(familyPrefix + ' ');
             });
 
-            // ── Recovery path: close matching issues when workflow is healthy ──
-            if (isHealthy) {
+            // ── Recovery path: close matching issues when workflow succeeds ──
+            if (isRecovery) {
               if (matchingIssues.length === 0) {
                 core.info('Workflow recovered but no open issues to close for family: ' + familyPrefix);
                 return;
@@ -165,6 +165,12 @@ jobs:
             }
 
             // ── Failure path: create or update issue ──
+            // Only act on known unhealthy conclusions; skip neutral/skipped/unknown
+            if (!unhealthyConclusions.includes(rawConclusion)) {
+              core.info('Ignoring non-actionable conclusion: ' + rawConclusion);
+              return;
+            }
+
             const conclusionMap = {
               failure: 'Failed',
               timed_out: 'Timed Out',
