@@ -19,6 +19,8 @@ preview-sync
 sync-labels
 git-flow
 
+validate-labels
+qws941-bot
 # Go workspace (local dev only)
 go.work
 go.work.sum
