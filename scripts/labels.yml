@@ -122,6 +122,10 @@
   color: "7057ff"
   description: "Codex AI automation trigger"
 
+- name: "possible-duplicate"
+  color: "cfd3d7"
+  description: "Potential duplicate detected by automation"
+
 - name: "keep-open"
   color: "0e8a16"
   description: "Exempt from stale bot auto-close"

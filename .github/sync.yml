@@ -72,6 +72,8 @@ group:
         dest: .github/workflows/commitlint.yml
       - source: .github/workflows/dependabot-auto-fix.yml
         dest: .github/workflows/dependabot-auto-fix.yml
+      - source: .github/workflows/issue-duplicate.yml
+        dest: .github/workflows/issue-duplicate.yml
       - source: .github/workflows/issue-label.yml
         dest: .github/workflows/issue-label.yml
       - source: .github/workflows/issue-sla.yml

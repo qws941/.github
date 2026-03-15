@@ -1,0 +1,162 @@
+name: Issue Duplicate Detection (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  duplicate-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
+      - name: Detect possible duplicates
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            // Get the issue that triggered this workflow
+            const issue = context.payload.issue;
+            if (!issue) {
+              core.info('No issue in context — skipping');
+              return;
+            }
+
+            // Skip PRs and issues already labeled
+            if (issue.pull_request) return;
+            const issueLabels = (issue.labels || []).map(l => l.name);
+            if (issueLabels.includes('possible-duplicate') || issueLabels.includes('status:duplicate')) {
+              core.info('Issue already marked as duplicate — skipping');
+              return;
+            }
+
+            // Normalize title: lowercase, remove common prefixes/brackets, collapse whitespace
+            const rawTitle = issue.title || '';
+            const normalizedTitle = rawTitle
+              .toLowerCase()
+              .replace(/^\[.*?\]\s*/, '')
+              .replace(/[^\w\s]/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+            // Extract meaningful keywords (skip stop words)
+            const stopWords = new Set([
+              'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+              'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+              'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought',
+              'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+              'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+              'between', 'out', 'off', 'over', 'under', 'again', 'further', 'then',
+              'once', 'not', 'no', 'nor', 'but', 'or', 'and', 'so', 'if', 'when',
+              'how', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+              'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it', 'they',
+              'them', 'its', 'his', 'her', 'their', 'all', 'each', 'every', 'both',
+              'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same',
+              'than', 'too', 'very', 'just', 'because', 'about', 'up', 'down',
+              'error', 'bug', 'issue', 'fix', 'broken', 'fail', 'failed', 'failure',
+              'request', 'feature', 'new', 'add', 'update', 'change'
+            ]);
+
+            const keywords = normalizedTitle.split(' ').filter(w => w.length > 2 && !stopWords.has(w));
+
+            if (keywords.length < 2) {
+              core.info('Too few meaningful keywords to search for duplicates: ' + keywords.join(', '));
+              return;
+            }
+
+            // Search for similar open issues using top keywords (max 5)
+            const searchTerms = keywords.slice(0, 5).join(' ');
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open ${searchTerms}`;
+
+            const { data: searchResults } = await github.rest.search.issuesAndPullRequests({
+              q: query,
+              per_page: 10,
+              sort: 'updated',
+              order: 'desc'
+            });
+
+            // Filter out the current issue and PRs
+            const candidates = searchResults.items.filter(item =>
+              item.number !== issue.number && !item.pull_request
+            );
+
+            if (candidates.length === 0) {
+              core.info('No duplicate candidates found');
+              return;
+            }
+
+            // Score candidates by keyword overlap
+            function jaccard(setA, setB) {
+              const intersection = [...setA].filter(x => setB.has(x));
+              const union = new Set([...setA, ...setB]);
+              return union.size === 0 ? 0 : intersection.length / union.size;
+            }
+
+            const issueKeywords = new Set(keywords);
+            const scored = candidates.map(candidate => {
+              const candidateNormalized = (candidate.title || '')
+                .toLowerCase()
+                .replace(/^\[.*?\]\s*/, '')
+                .replace(/[^\w\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              const candidateWords = candidateNormalized.split(' ').filter(w => w.length > 2 && !stopWords.has(w));
+              const score = jaccard(issueKeywords, new Set(candidateWords));
+              return { ...candidate, score };
+            }).filter(c => c.score >= 0.5);  // 50% Jaccard threshold
+
+            if (scored.length === 0) {
+              core.info('No candidates above similarity threshold');
+              return;
+            }
+
+            // Sort by score descending, take top 3
+            scored.sort((a, b) => b.score - a.score);
+            const topMatches = scored.slice(0, 3);
+
+            // Check idempotency: skip if marker comment already exists
+            const marker = `<!-- issue-duplicate:checked:${issue.number} -->`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100
+            });
+
+            if (comments.some(c => (c.body || '').includes(marker))) {
+              core.info('Duplicate check already performed for issue #' + issue.number);
+              return;
+            }
+
+            // Post comment with potential duplicates
+            const matchList = topMatches.map(m =>
+              `- #${m.number} — ${m.title} (${Math.round(m.score * 100)}% similar)`
+            ).join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: [
+                marker,
+                '## Possible Duplicates Detected',
+                '',
+                'The following open issues have similar titles:',
+                '',
+                matchList,
+                '',
+                'If this is a duplicate, please close this issue and reference the original.',
+                'If not, you can ignore this notice or remove the `possible-duplicate` label.'
+              ].join('\n')
+            });
+
+            // Add possible-duplicate label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['possible-duplicate']
+            });
+
+            core.info('Flagged issue #' + issue.number + ' as possible duplicate (' + topMatches.length + ' candidates)');
