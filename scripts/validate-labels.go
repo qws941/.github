@@ -57,7 +57,7 @@ type scanTarget struct {
 var labelPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`['"]([a-z]+:[a-z][-a-z]*)['"]`),                    // type:bug, status:in-progress, priority:high, risk:low
 	regexp.MustCompile(`['"]size/(xs|s|m|l|xl)['"]`),                       // size/xs .. size/xl
-	regexp.MustCompile(`['"](auto-merge|codex|sync|keep-open|pinned)['"]`), // bare automation labels
+	regexp.MustCompile(`['"](auto-merge|opencode-agent|sync|keep-open|pinned)['"]`), // bare automation labels
 }
 
 // csvLabelPattern matches comma-separated label lists inside quotes.
@@ -65,7 +65,7 @@ var labelPatterns = []*regexp.Regexp{
 var csvLabelPattern = regexp.MustCompile(`['"]([a-z][-a-z]*(?::[a-z][-a-z]*)?,(?:[a-z][-a-z]*(?::[a-z][-a-z]*)?,)*[a-z][-a-z]*(?::[a-z][-a-z]*)?)['"]`)
 
 // individualLabelShape matches a single label token after CSV splitting.
-var individualLabelShape = regexp.MustCompile(`^(?:[a-z]+:[a-z][-a-z]*|size/(?:xs|s|m|l|xl)|auto-merge|codex|sync|keep-open|pinned)$`)
+var individualLabelShape = regexp.MustCompile(`^(?:[a-z]+:[a-z][-a-z]*|size/(?:xs|s|m|l|xl)|auto-merge|opencode-agent|sync|keep-open|pinned)$`)
 
 // Known false positives — strings that match label patterns but aren't labels.
 var falsePositives = map[string]bool{

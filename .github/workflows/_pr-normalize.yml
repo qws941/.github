@@ -163,43 +163,10 @@ jobs:
               return;
             }
 
-            function sizeLabelForChanges(lines) {
-              if (lines <= 10) return 'size/xs';
-              if (lines <= 50) return 'size/s';
-              if (lines <= 200) return 'size/m';
-              if (lines <= 500) return 'size/l';
-              return 'size/xl';
-            }
-
-            const sizeLabels = ['size/xs', 'size/s', 'size/m', 'size/l', 'size/xl'];
             const existingLabels = (pr.labels || []).map((l) => l.name);
-            const currentSizeLabels = existingLabels.filter((name) => sizeLabels.includes(name));
-            const desiredSizeLabel = sizeLabelForChanges(totalChanges);
 
-            for (const oldLabel of currentSizeLabels) {
-              if (oldLabel === desiredSizeLabel) continue;
-              try {
-                await github.rest.issues.removeLabel({
-                  owner,
-                  repo,
-                  issue_number: pr.number,
-                  name: oldLabel,
-                });
-                console.log(`Removed stale size label: ${oldLabel}`);
-              } catch (error) {
-                if (error.status !== 404) throw error;
-              }
-            }
-
-            if (!existingLabels.includes(desiredSizeLabel)) {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number: pr.number,
-                labels: [desiredSizeLabel],
-              });
-              console.log(`Added size label: ${desiredSizeLabel}`);
-            }
+            const isOversized = totalChanges > 500;
+            const shouldAutoMergeLabel = Boolean(linkedIssue) && totalChanges < 500;
 
             const isOversized = totalChanges > 500;
             const shouldAutoMergeLabel = Boolean(linkedIssue) && totalChanges < 500;

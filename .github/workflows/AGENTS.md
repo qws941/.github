@@ -21,7 +21,7 @@
 |------|----------|-------|
 | Change reusable CI behavior | `.github/workflows/_ci-node.yml`, `.github/workflows/_ci-python.yml` | Parameterized `workflow_call` templates |
 | Change PR automation | `.github/workflows/_auto-merge.yml`, `.github/workflows/_auto-approve-runs.yml` | Trusted-actor and recovery logic lives here |
-| Change Codex automation | `.github/workflows/_codex-*.yml` | Issue and PR automation templates |
+| Change OpenCode agent automation | `.github/workflows/_opencode-agent-timeout.yml`, `.github/workflows/_pr-normalize.yml` | Issue timeout and PR normalization templates |
 | Change downstream sync behavior | `.github/workflows/sync-files.yml` | Direct push via `repo-file-sync-action` |
 | Change downstream audit behavior | `.github/workflows/downstream-automation-audit.yml` | Flags missing, drifted, disabled, stale, or unhealthy callers |
 | Change label sync trigger | `.github/workflows/sync-labels.yml` | Runs `go run scripts/sync-labels.go` |
