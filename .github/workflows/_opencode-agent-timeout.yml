@@ -1,0 +1,128 @@
+name: OpenCode Agent Timeout (Reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  issues: write
+
+jobs:
+  timeout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01c0a04d569228b84ad0a1 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Close stale OpenCode agent issues
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const TIMEOUT_MS = 72 * 60 * 60 * 1000;
+            const now = Date.now();
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              labels: 'opencode-agent',
+              state: 'open',
+              per_page: 100,
+            });
+
+            let closed = 0;
+
+            for (const issue of issues) {
+              if (issue.pull_request) {
+                continue;
+              }
+
+              const issueAgeMs = now - new Date(issue.created_at).getTime();
+              if (issueAgeMs < TIMEOUT_MS) {
+                continue;
+              }
+
+              const linkedPrQuery = `repo:${owner}/${repo} is:pr is:open ${issue.number}`;
+              const { data: linkedPrSearch } = await github.rest.search.issuesAndPullRequests({
+                q: linkedPrQuery,
+                per_page: 1,
+              });
+
+              if ((linkedPrSearch.items || []).length > 0) {
+                console.log(`#${issue.number}: linked open PR found, skipping`);
+                continue;
+              }
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issue.number,
+                per_page: 100,
+              });
+
+              const lastComment = comments.length > 0 ? comments[comments.length - 1] : null;
+              const lastBody = typeof lastComment?.body === 'string' ? lastComment.body : '';
+              const markerMatch = lastBody.match(/<!--\s*opencode:event=([^:>\s]+):correlation=[^:>]*:run=[^>]*-->/);
+              const lastEventType = markerMatch ? markerMatch[1] : null;
+
+              if (lastEventType === 'opencode.task.done') {
+                console.log(`#${issue.number}: last marker is done, skipping`);
+                continue;
+              }
+
+              if (lastEventType !== 'opencode.task.blocked' && lastEventType !== null) {
+                console.log(`#${issue.number}: last marker is '${lastEventType}', skipping`);
+                continue;
+              }
+
+              const reasonText = lastEventType === 'opencode.task.blocked'
+                ? 'OpenCode marked this task as blocked and no resolution was completed within 72 hours.'
+                : 'No OpenCode writeback marker was posted after 72 hours.';
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body: [
+                  '🤖 **OpenCode timeout closure**',
+                  '',
+                  reasonText,
+                  '',
+                  'Closing as `not_planned`, removing `opencode-agent`, and applying `status:wontfix`.',
+                ].join('\n'),
+              });
+
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  name: 'opencode-agent',
+                });
+              } catch (error) {
+                console.log(`#${issue.number}: unable to remove label 'opencode-agent' (${error.message})`);
+              }
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issue.number,
+                labels: ['status:wontfix'],
+              });
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'not_planned',
+              });
+
+              closed += 1;
+              console.log(`#${issue.number}: closed as stale`);
+            }
+
+            console.log(`Total closed: ${closed}`);

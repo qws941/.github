@@ -2,8 +2,8 @@
 # SSoT: qws941/.github — do not duplicate in consuming repos
 #
 # Checks for open Dependabot security alerts that cannot be auto-fixed,
-# creates issues with context, and labels them 'codex' so the Codex
-# pipeline automatically investigates and creates fix PRs.
+# creates issues with context, and labels them 'opencode-agent' so the OpenCode
+# agent pipeline automatically investigates and creates fix PRs.
 #
 # Usage:
 #   jobs:
@@ -59,7 +59,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'codex',
+              labels: 'opencode-agent',
               per_page: 100,
             });
 
@@ -69,7 +69,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'closed',
-              labels: 'codex',
+              labels: 'opencode-agent',
               since,
               per_page: 100,
             });
@@ -187,7 +187,7 @@ jobs:
                 repo: context.repo.repo,
                 title: issueTitle,
                 body: issueBody,
-                labels: ['codex', 'type:security'],
+                labels: ['opencode-agent', 'type:security'],
               });
 
               core.info(`Created issue #${issue.number} for ${pkg}`);

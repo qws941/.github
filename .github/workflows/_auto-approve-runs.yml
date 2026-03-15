@@ -40,10 +40,8 @@ jobs:
             const trustedActors = new Set([
               'github-actions[bot]',
               'dependabot[bot]',
-              'chatgpt-codex-connector[bot]',
-              'openai-code-agent[bot]',
-              'codex[bot]',
-              'Codex',
+              context.repo.owner,
+            ]);
               context.repo.owner,
             ]);
             const prEvents = new Set(['pull_request', 'pull_request_target']);

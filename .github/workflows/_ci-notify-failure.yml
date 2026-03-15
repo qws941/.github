@@ -24,7 +24,7 @@ on:
         description: 'Comma-separated labels for the issue'
         required: false
         type: string
-        default: 'type:ci,priority:high,codex'
+        default: 'type:ci,priority:high,opencode-agent'
       extra-body:
         description: 'Additional context to append to auto-generated body'
         required: false
@@ -62,7 +62,7 @@ jobs:
             const commitUrl = serverUrl + '/' + owner + '/' + repo + '/commit/' + context.sha;
             const inputPrefix = process.env.INPUT_TITLE_PREFIX || '';
             const extraBody = process.env.INPUT_EXTRA_BODY || '';
-            const labels = (process.env.INPUT_LABELS || 'type:ci,priority:high,codex')
+            const labels = (process.env.INPUT_LABELS || 'type:ci,priority:high,opencode-agent')
               .split(',')
               .map(l => l.trim())
               .filter(Boolean);

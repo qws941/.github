@@ -31,7 +31,7 @@ jobs:
       - name: Audit downstream automation coverage
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          AUDIT_ISSUE_LABELS: 'type:ci,priority:high,codex'
+          AUDIT_ISSUE_LABELS: 'type:ci,priority:high,opencode-agent'
           AUDIT_SCHEDULE_STALE_DAYS: '10'
           AUDIT_UNHEALTHY_CONCLUSIONS: 'failure,timed_out,action_required,cancelled'
         with:

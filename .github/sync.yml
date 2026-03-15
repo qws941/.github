@@ -58,16 +58,6 @@ group:
         dest: .github/workflows/branch-cleanup.yml
       - source: .github/workflows/ci-notify-failure.yml
         dest: .github/workflows/ci-notify-failure.yml
-      - source: .github/workflows/codex-auto-issue.yml
-        dest: .github/workflows/codex-auto-issue.yml
-      - source: .github/workflows/codex-issue-timeout.yml
-        dest: .github/workflows/codex-issue-timeout.yml
-      - source: .github/workflows/codex-pr-normalize.yml
-        dest: .github/workflows/codex-pr-normalize.yml
-      - source: .github/workflows/codex-pr-review.yml
-        dest: .github/workflows/codex-pr-review.yml
-      - source: .github/workflows/codex-triage.yml
-        dest: .github/workflows/codex-triage.yml
       - source: .github/workflows/commitlint.yml
         dest: .github/workflows/commitlint.yml
       - source: .github/workflows/dependabot-auto-fix.yml
@@ -86,12 +76,16 @@ group:
         dest: .github/workflows/labeler.yml
       - source: .github/workflows/lock-threads.yml
         dest: .github/workflows/lock-threads.yml
+      - source: .github/workflows/opencode-agent-timeout.yml
+        dest: .github/workflows/opencode-agent-timeout.yml
       - source: .github/workflows/opencode-issue-sync.yml
         dest: .github/workflows/opencode-issue-sync.yml
       - source: .github/workflows/opencode-pr-sync.yml
         dest: .github/workflows/opencode-pr-sync.yml
       - source: .github/workflows/opencode-writeback.yml
         dest: .github/workflows/opencode-writeback.yml
+      - source: .github/workflows/pr-normalize.yml
+        dest: .github/workflows/pr-normalize.yml
       - source: .github/workflows/pr-size.yml
         dest: .github/workflows/pr-size.yml
       - source: .github/workflows/release-drafter.yml

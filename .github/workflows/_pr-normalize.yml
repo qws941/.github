@@ -1,0 +1,307 @@
+name: PR Normalize (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      github-token:
+        description: GitHub token used by normalization automation
+        required: false
+        type: string
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+    if: >-
+      endsWith(github.event.pull_request.user.login, '[bot]') ||
+      startsWith(github.event.pull_request.head.ref, 'feat/') ||
+      startsWith(github.event.pull_request.head.ref, 'fix/') ||
+      startsWith(github.event.pull_request.head.ref, 'docs/') ||
+      startsWith(github.event.pull_request.head.ref, 'refactor/') ||
+      startsWith(github.event.pull_request.head.ref, 'test/') ||
+      startsWith(github.event.pull_request.head.ref, 'ci/') ||
+      startsWith(github.event.pull_request.head.ref, 'chore/') ||
+      startsWith(github.event.pull_request.head.ref, 'opencode/')
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01c0a04d569228b84ad0a1 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Normalize PR metadata and labels
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          github-token: ${{ inputs.github-token || github.token }}
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = pr.title || '';
+            const body = pr.body || '';
+            const branch = pr.head.ref || '';
+            const isBotAuthored = (pr.user?.login || '').endsWith('[bot]');
+
+            const conventionalRe = /^(feat|fix|docs|refactor|test|ci|chore)(\(.+\))?!?:\s+/;
+
+            function normalizeBranchRef(ref) {
+              if (ref.startsWith('opencode/')) {
+                return ref.slice('opencode/'.length);
+              }
+              return ref;
+            }
+
+            function parseBranchTypeAndSlug(ref) {
+              const normalized = normalizeBranchRef(ref);
+              const match = normalized.match(/^(feat|fix|docs|refactor|test|ci|chore)\/(.+)$/);
+              if (!match) return null;
+              return { type: match[1], slug: match[2] };
+            }
+
+            function cleanSummary(text) {
+              let value = text
+                .replace(/[._]+/g, ' ')
+                .replace(/[-/]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (!value) return 'update';
+              if (/^[A-Z][a-z]/.test(value)) {
+                value = value.charAt(0).toLowerCase() + value.slice(1);
+              }
+              return value;
+            }
+
+            const branchInfo = parseBranchTypeAndSlug(branch);
+            const needsTitleFix = !conventionalRe.test(title) && Boolean(branchInfo);
+            const newTitle = needsTitleFix
+              ? `${branchInfo.type}: ${cleanSummary(branchInfo.slug)}`
+              : title;
+
+            const hasCloseRef = /(?:Closes|Fixes|Resolves)\s+#\d+/i.test(body);
+            let linkedIssue = null;
+            if (!hasCloseRef && branchInfo) {
+              const keywords = branchInfo.slug
+                .split(/[^a-zA-Z0-9]+/)
+                .map((w) => w.toLowerCase())
+                .filter((w) => w.length > 2)
+                .slice(0, 8);
+
+              if (keywords.length >= 2) {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner,
+                  repo,
+                  labels: 'opencode-agent',
+                  state: 'open',
+                  per_page: 100,
+                });
+
+                let bestScore = 0;
+                for (const issue of issues) {
+                  if (issue.pull_request) continue;
+                  const issueWords = `${issue.title} ${issue.body || ''}`
+                    .toLowerCase()
+                    .split(/[^a-z0-9]+/)
+                    .filter(Boolean);
+                  const score = keywords.filter((kw) =>
+                    issueWords.some((word) => word.includes(kw) || kw.includes(word))
+                  ).length;
+                  if (score > bestScore && score >= 2) {
+                    bestScore = score;
+                    linkedIssue = issue;
+                  }
+                }
+              }
+            }
+
+            let updatedBody = body;
+            if (linkedIssue) {
+              updatedBody = `${body}\n\nCloses #${linkedIssue.number}`.trim();
+            }
+
+            if (needsTitleFix || linkedIssue) {
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                ...(needsTitleFix ? { title: newTitle } : {}),
+                ...(linkedIssue ? { body: updatedBody } : {}),
+              });
+              if (needsTitleFix) {
+                console.log(`Title normalized: "${title}" -> "${newTitle}"`);
+              }
+              if (linkedIssue) {
+                console.log(`Linked issue #${linkedIssue.number}`);
+              }
+            }
+
+            const prFiles = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const totalChanges = prFiles.reduce((sum, file) => sum + (file.changes || 0), 0);
+            const fileCount = prFiles.length;
+
+            if (fileCount === 0) {
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                state: 'closed',
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: '🚫 **Empty PR** — This PR contains no changed files. Closing automatically.',
+              });
+              console.log('Closed empty PR (0 files changed)');
+              return;
+            }
+
+            function sizeLabelForChanges(lines) {
+              if (lines <= 10) return 'size/xs';
+              if (lines <= 50) return 'size/s';
+              if (lines <= 200) return 'size/m';
+              if (lines <= 500) return 'size/l';
+              return 'size/xl';
+            }
+
+            const sizeLabels = ['size/xs', 'size/s', 'size/m', 'size/l', 'size/xl'];
+            const existingLabels = (pr.labels || []).map((l) => l.name);
+            const currentSizeLabels = existingLabels.filter((name) => sizeLabels.includes(name));
+            const desiredSizeLabel = sizeLabelForChanges(totalChanges);
+
+            for (const oldLabel of currentSizeLabels) {
+              if (oldLabel === desiredSizeLabel) continue;
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  name: oldLabel,
+                });
+                console.log(`Removed stale size label: ${oldLabel}`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            if (!existingLabels.includes(desiredSizeLabel)) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: [desiredSizeLabel],
+              });
+              console.log(`Added size label: ${desiredSizeLabel}`);
+            }
+
+            const isOversized = totalChanges > 500;
+            const shouldAutoMergeLabel = Boolean(linkedIssue) && totalChanges < 500;
+
+            if (shouldAutoMergeLabel && !existingLabels.includes('auto-merge')) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: ['auto-merge'],
+              });
+              console.log('Added auto-merge label');
+            }
+
+            if (!shouldAutoMergeLabel && existingLabels.includes('auto-merge')) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  name: 'auto-merge',
+                });
+                console.log('Removed auto-merge label');
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            if (isOversized) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: pr.number,
+                per_page: 100,
+              });
+
+              const warningMarker = '⚠️ **Oversized PR**';
+              const warningExists = comments.some((comment) =>
+                (comment.body || '').includes(warningMarker)
+              );
+
+              if (!warningExists) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  body: `${warningMarker} — This PR changes ${totalChanges} lines (threshold: 500). Please split into smaller PRs when possible.`,
+                });
+                console.log(`Posted oversized warning comment (${totalChanges} LOC)`);
+              }
+            }
+
+            if (pr.draft && isBotAuthored) {
+              await github.graphql(
+                `
+                  mutation($id: ID!) {
+                    markPullRequestReadyForReview(input: { pullRequestId: $id }) {
+                      pullRequest { isDraft }
+                    }
+                  }
+                `,
+                { id: pr.node_id }
+              );
+              console.log('Marked bot-authored draft PR as ready for review');
+            }
+
+            if (linkedIssue) {
+              const duplicateIssueRefRe = new RegExp(
+                `(?:Closes|Fixes|Resolves)\\s+#${linkedIssue.number}\\b`,
+                'i'
+              );
+
+              const { data: openPRs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                per_page: 100,
+                base: pr.base.ref,
+              });
+
+              for (const other of openPRs) {
+                if (other.number === pr.number) continue;
+                if (!duplicateIssueRefRe.test(other.body || '')) continue;
+
+                const otherCreated = new Date(other.created_at).getTime();
+                const thisCreated = new Date(pr.created_at).getTime();
+                const shouldCloseOther = otherCreated < thisCreated;
+
+                if (!shouldCloseOther) continue;
+
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: other.number,
+                  state: 'closed',
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: other.number,
+                  body: `Superseded by #${pr.number} — closing duplicate targeting ${pr.base.ref}.`,
+                });
+                console.log(`Closed duplicate PR #${other.number}`);
+              }
+            }

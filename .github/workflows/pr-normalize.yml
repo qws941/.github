@@ -1,9 +1,9 @@
-# Codex PR Normalize
+# PR Normalize
 # SSoT: qws941/.github — synced to all repos
 # Synced via: .github/sync.yml
-# Template: _codex-pr-normalize.yml
+# Template: _pr-normalize.yml
 
-name: Codex PR Normalize
+name: PR Normalize
 
 on:
   pull_request_target:
@@ -14,10 +14,10 @@ permissions:
   issues: write
 
 concurrency:
-  group: codex-normalize-${{ github.event.pull_request.number }}
+  group: pr-normalize-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   normalize:
-    uses: qws941/.github/.github/workflows/_codex-pr-normalize.yml@master
-    secrets: inherit
+    uses: qws941/.github/.github/workflows/_pr-normalize.yml@master
+    secrets: inherit # pragma: allowlist secret
