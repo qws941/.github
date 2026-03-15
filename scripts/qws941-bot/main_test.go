@@ -207,8 +207,8 @@ func TestHandleWebhook_DispatchIssueCommentEvent(t *testing.T) {
 	if submitted.JobID != "bot-delivery-1-42" {
 		t.Fatalf("job_id = %q, want bot-delivery-1-42", submitted.JobID)
 	}
-	if submitted.Mode != "async" {
-		t.Fatalf("mode = %q, want async", submitted.Mode)
+	if submitted.Mode != "run" {
+		t.Fatalf("mode = %q, want run", submitted.Mode)
 	}
 	if submitted.CallbackURL != "https://bot.example/callback" {
 		t.Fatalf("callback_url = %q, want https://bot.example/callback", submitted.CallbackURL)

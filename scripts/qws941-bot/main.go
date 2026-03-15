@@ -174,7 +174,7 @@ func (b *bot) handleIssueCommentEvent(ctx context.Context, payload webhookPayloa
 		JobID:       jobID,
 		Prompt:      fullPrompt,
 		Repo:        payload.Repository.FullName,
-		Mode:        "async",
+		Mode:        "run",
 		CallbackURL: b.cfg.callbackBase + "/callback",
 	})
 	if err != nil {
@@ -224,7 +224,7 @@ func (b *bot) handlePRReviewCommentEvent(ctx context.Context, payload webhookPay
 		JobID:       jobID,
 		Prompt:      fullPrompt,
 		Repo:        payload.Repository.FullName,
-		Mode:        "async",
+		Mode:        "run",
 		CallbackURL: b.cfg.callbackBase + "/callback",
 	})
 	if err != nil {
@@ -289,7 +289,7 @@ Format your response as a GitHub PR review comment (markdown).`,
 		JobID:       jobID,
 		Prompt:      prompt,
 		Repo:        payload.Repository.FullName,
-		Mode:        "async",
+		Mode:        "run",
 		CallbackURL: b.cfg.callbackBase + "/callback",
 	})
 	if err != nil {
