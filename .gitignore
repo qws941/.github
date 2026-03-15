@@ -29,3 +29,4 @@ go.work.sum
 # Backup files
 *.backup
 *.backup-*
+/qws941-bot
