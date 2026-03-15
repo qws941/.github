@@ -1,0 +1,100 @@
+name: Issue SLA Escalation (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  sla-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
+      - name: Check SLA compliance
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const CRITICAL_IDLE_MS = 24 * 60 * 60 * 1000;
+            const HIGH_IDLE_MS = 72 * 60 * 60 * 1000;
+            const now = Date.now();
+
+            const skipLabels = new Set([
+              'keep-open',
+              'pinned',
+              'type:security',
+              'status:in-progress'
+            ]);
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            let breached = 0;
+            let warned = 0;
+            let checked = 0;
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const labelNames = new Set(issue.labels.map(label => label.name));
+              if ([...skipLabels].some(name => labelNames.has(name))) continue;
+
+              checked++;
+              const idleMs = now - new Date(issue.updated_at).getTime();
+
+              if (labelNames.has('priority:critical') && idleMs > CRITICAL_IDLE_MS) {
+                if (labelNames.has('sla:breached')) {
+                  console.log(`#${issue.number}: already has sla:breached, skipping`);
+                  continue;
+                }
+
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['sla:breached']
+                });
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `<!-- issue-sla:breached -->\n⚠️ **SLA Breached**: This \`priority:critical\` issue has been idle for more than 24 hours.\n\ncc @${context.repo.owner}`
+                });
+
+                breached++;
+                console.log(`#${issue.number}: marked sla:breached`);
+                continue;
+              }
+
+              if (labelNames.has('priority:high') && idleMs > HIGH_IDLE_MS) {
+                if (labelNames.has('sla:warning')) {
+                  console.log(`#${issue.number}: already has sla:warning, skipping`);
+                  continue;
+                }
+
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['sla:warning']
+                });
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `<!-- issue-sla:warning -->\n⏰ **SLA Warning**: This \`priority:high\` issue has been idle for more than 72 hours.\n\ncc @${context.repo.owner}`
+                });
+
+                warned++;
+                console.log(`#${issue.number}: marked sla:warning`);
+              }
+            }
+
+            console.log(`Total: ${breached} breached, ${warned} warned out of ${checked} checked`);

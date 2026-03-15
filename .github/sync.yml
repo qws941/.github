@@ -74,8 +74,12 @@ group:
         dest: .github/workflows/dependabot-auto-fix.yml
       - source: .github/workflows/issue-label.yml
         dest: .github/workflows/issue-label.yml
+      - source: .github/workflows/issue-sla.yml
+        dest: .github/workflows/issue-sla.yml
       - source: .github/workflows/issue-lifecycle.yml
         dest: .github/workflows/issue-lifecycle.yml
+      - source: .github/workflows/issue-project.yml
+        dest: .github/workflows/issue-project.yml
       - source: .github/workflows/labeler.yml
         dest: .github/workflows/labeler.yml
       - source: .github/workflows/lock-threads.yml

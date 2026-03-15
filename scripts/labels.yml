@@ -80,6 +80,14 @@
   color: "cfd3d7"
   description: "Duplicate of another issue"
 
+- name: "sla:breached"
+  color: "b60205"
+  description: "SLA breached — critical/high priority issue idle too long"
+
+- name: "sla:warning"
+  color: "e99695"
+  description: "SLA warning — high priority issue approaching deadline"
+
 # Size labels (auto-applied by pr-size.yml workflow)
 - name: "size/xs"
   color: "3cbf00"
