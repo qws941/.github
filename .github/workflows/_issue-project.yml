@@ -1,0 +1,179 @@
+name: Issue Project Routing (Reusable)
+
+on:
+  workflow_call:
+    secrets:
+      ADD_TO_PROJECT_PAT:
+        required: false
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
+      - name: Route issue to project
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PROJECT_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PROJECT_URL: ${{ vars.ISSUE_PROJECT_URL }}
+        with:
+          script: |
+            if (!process.env.PROJECT_PAT) {
+              core.notice('ADD_TO_PROJECT_PAT secret not configured — skipping project routing');
+              return;
+            }
+
+            if (!process.env.PROJECT_URL) {
+              core.notice('ISSUE_PROJECT_URL variable not configured — skipping project routing');
+              return;
+            }
+
+            const projectUrl = process.env.PROJECT_URL.trim();
+            const urlMatch = projectUrl.match(/^https:\/\/github\.com\/(orgs|users)\/([^/]+)\/projects\/(\d+)(?:\/.*)?$/i);
+            if (!urlMatch) {
+              core.warning('Invalid project URL format: ' + projectUrl);
+              return;
+            }
+
+            const ownerType = urlMatch[1].toLowerCase();
+            const owner = urlMatch[2];
+            const projectNumber = Number(urlMatch[3]);
+
+            const labels = (context.payload.issue?.labels || []).map((label) => label.name);
+            const labelSet = new Set(labels);
+            const hasBug = labelSet.has('type:bug');
+            const hasCritical = labelSet.has('priority:critical');
+            const hasFeature = labelSet.has('type:feature');
+            const hasSecurity = labelSet.has('type:security');
+
+            let targetStatus = 'Triage';
+            if (hasBug && hasCritical) {
+              targetStatus = 'Urgent';
+            } else if (hasBug) {
+              targetStatus = 'Triage';
+            } else if (hasFeature) {
+              targetStatus = 'Backlog';
+            } else if (hasSecurity) {
+              targetStatus = 'Urgent';
+            }
+
+            console.log(`Routing issue #${context.issue.number} to ${projectUrl} with status ${targetStatus}`);
+
+            const { getOctokit } = require('@actions/github');
+            const projectClient = getOctokit(process.env.PROJECT_PAT);
+
+            try {
+              let projectId;
+
+              if (ownerType === 'orgs') {
+                const projectResult = await projectClient.graphql(
+                  `query($org: String!, $number: Int!) {
+                    organization(login: $org) {
+                      projectV2(number: $number) {
+                        id
+                      }
+                    }
+                  }`,
+                  { org: owner, number: projectNumber }
+                );
+                projectId = projectResult.organization?.projectV2?.id;
+              } else {
+                const projectResult = await projectClient.graphql(
+                  `query($user: String!, $number: Int!) {
+                    user(login: $user) {
+                      projectV2(number: $number) {
+                        id
+                      }
+                    }
+                  }`,
+                  { user: owner, number: projectNumber }
+                );
+                projectId = projectResult.user?.projectV2?.id;
+              }
+
+              if (!projectId) {
+                core.warning('Project not found: ' + process.env.PROJECT_URL);
+                return;
+              }
+
+              const addItemResult = await projectClient.graphql(
+                `mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                    item {
+                      id
+                    }
+                  }
+                }`,
+                {
+                  projectId,
+                  contentId: context.payload.issue.node_id,
+                }
+              );
+
+              const itemId = addItemResult.addProjectV2ItemById?.item?.id;
+              if (!itemId) {
+                core.warning('Failed to add issue to project');
+                return;
+              }
+
+              console.log(`Issue added to project with item ID ${itemId}`);
+
+              const fieldsResult = await projectClient.graphql(
+                `query($projectId: ID!) {
+                  node(id: $projectId) {
+                    ... on ProjectV2 {
+                      fields(first: 20) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                              id
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`,
+                { projectId }
+              );
+
+              const statusField = fieldsResult.node?.fields?.nodes?.find((field) => field.name === 'Status');
+              const statusOption = statusField?.options?.find((option) => option.name === targetStatus);
+
+              if (!statusField || !statusOption) {
+                core.warning('Status field/option not found, item added without status');
+                return;
+              }
+
+              await projectClient.graphql(
+                `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: {singleSelectOptionId: $value}
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }`,
+                {
+                  projectId,
+                  itemId,
+                  fieldId: statusField.id,
+                  value: statusOption.id,
+                }
+              );
+
+              console.log(`Project status set to ${targetStatus}`);
+            } catch (error) {
+              core.warning('Project routing failed: ' + error.message);
+            }
