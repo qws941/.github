@@ -42,11 +42,9 @@ jobs:
               'dependabot[bot]',
               context.repo.owner,
             ]);
-              context.repo.owner,
-            ]);
             const prEvents = new Set(['pull_request', 'pull_request_target']);
             const workflowEventAllowlist = new Map([
-              ['Automation Health', new Set(['workflow_run', 'workflow_dispatch'])],
+              ['Automation Health', new Set(['schedule', 'workflow_dispatch'])],
               ['Auto Merge', new Set(['pull_request_target'])],
               ['Auto Approve Runs', new Set(['pull_request_target', 'workflow_dispatch', 'schedule'])],
               ['Codex PR Normalize', new Set(['pull_request_target'])],

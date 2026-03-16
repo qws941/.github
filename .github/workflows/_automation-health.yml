@@ -134,6 +134,22 @@ jobs:
             const missing = [];
             const unhealthy = [];
 
+            // Batch: fetch recent runs for all workflows in a single API call
+            const { data: allRepoRuns } = await retryWithBackoff(() =>
+              github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                per_page: 100,
+              })
+            );
+
+            // Group runs by workflow name for O(1) lookup
+            const runsByName = new Map();
+            for (const run of allRepoRuns.workflow_runs) {
+              if (!runsByName.has(run.name)) runsByName.set(run.name, []);
+              runsByName.get(run.name).push(run);
+            }
+
             for (const workflowName of workflowNames) {
               const workflowId = nameToId.get(workflowName);
               if (!workflowId) {
@@ -141,17 +157,22 @@ jobs:
                 continue;
               }
 
-              const { data: runs } = await retryWithBackoff(() =>
-                github.rest.actions.listWorkflowRuns({
-                  owner,
-                  repo,
-                  workflow_id: workflowId,
-                  per_page: 10,
-                })
-              );
-              await sleep(200);
+              let workflowRuns = runsByName.get(workflowName) || [];
 
-              const run = selectRelevantRun(workflowName, runs.workflow_runs);
+              // Fallback: if workflow absent from top-100 repo-wide window, fetch it directly
+              if (workflowRuns.length === 0) {
+                const { data: fallbackData } = await retryWithBackoff(() =>
+                  github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: workflowId,
+                    per_page: 1,
+                  })
+                );
+                workflowRuns = fallbackData.workflow_runs;
+              }
+
+              const run = selectRelevantRun(workflowName, workflowRuns);
               if (!run) {
                 checked.push(`${workflowName}:no_matching_run`);
                 continue;
