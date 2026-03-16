@@ -4,18 +4,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
+	"scripts/internal/ghcli"
 )
 
 const (
@@ -78,21 +81,26 @@ func main() {
 	workers := flag.Int("workers", defaultWorkerCount, "Parallel workers")
 	flag.Parse()
 
-	if *workers < 1 {
-		fatal("workers must be >= 1")
+	ctx := context.Background()
+	if _, err := ghcli.EnsureBudget(ctx, 100); err != nil {
+		cli.Fatal("rate limit: %v", err)
 	}
 
-	upstreamRepo, err := currentRepo()
+	if *workers < 1 {
+		cli.Fatal("workers must be >= 1")
+	}
+
+	upstreamRepo, err := currentRepo(ctx)
 	if err != nil {
-		fatal("resolve current repo: %v", err)
+		cli.Fatal("resolve current repo: %v", err)
 	}
 
 	repos, err := targetRepos(*singleRepo)
 	if err != nil {
-		fatal("load target repos: %v", err)
+		cli.Fatal("load target repos: %v", err)
 	}
 
-	results := scanRepos(repos, *workers)
+	results := scanRepos(ctx, repos, *workers)
 	violations, workflowsScanned, scanErrs := summarizeResults(results)
 	report := buildReport(len(repos), workflowsScanned, violations)
 
@@ -111,9 +119,9 @@ func main() {
 		return
 	}
 
-	issueURL, err := reconcileIssue(upstreamRepo, violations, report)
+	issueURL, err := reconcileIssue(ctx, upstreamRepo, violations, report)
 	if err != nil {
-		fatal("reconcile issue: %v", err)
+		cli.Fatal("reconcile issue: %v", err)
 	}
 
 	if issueURL != "" {
@@ -123,8 +131,8 @@ func main() {
 	}
 }
 
-func currentRepo() (string, error) {
-	out, err := ghOutput("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+func currentRepo(ctx context.Context) (string, error) {
+	out, err := ghcli.Output(ctx, "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
 	if err != nil {
 		return "", err
 	}
@@ -139,7 +147,7 @@ func targetRepos(single string) ([]string, error) {
 		return []string{single}, nil
 	}
 
-	syncPath, err := resolveFromRoot(syncFile)
+	syncPath, err := fsutil.ResolveFromRoot(syncFile)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +179,7 @@ func targetRepos(single string) ([]string, error) {
 	return repos, nil
 }
 
-func scanRepos(repos []string, workers int) []repoScanResult {
+func scanRepos(ctx context.Context, repos []string, workers int) []repoScanResult {
 	jobs := make(chan string, len(repos))
 	results := make(chan repoScanResult, len(repos))
 
@@ -186,7 +194,7 @@ func scanRepos(repos []string, workers int) []repoScanResult {
 		go func() {
 			defer wg.Done()
 			for repo := range jobs {
-				results <- scanRepo(repo)
+				results <- scanRepo(ctx, repo)
 			}
 		}()
 	}
@@ -205,10 +213,10 @@ func scanRepos(repos []string, workers int) []repoScanResult {
 	return collected
 }
 
-func scanRepo(repo string) repoScanResult {
+func scanRepo(ctx context.Context, repo string) repoScanResult {
 	result := repoScanResult{Repo: repo}
 
-	workflowPaths, err := listWorkflowPaths(repo)
+	workflowPaths, err := listWorkflowPaths(ctx, repo)
 	if err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("%s: list workflows: %v", repo, err))
 		return result
@@ -216,7 +224,7 @@ func scanRepo(repo string) repoScanResult {
 
 	result.WorkflowCount = len(workflowPaths)
 	for _, workflowPath := range workflowPaths {
-		content, err := fetchFileContent(repo, workflowPath)
+		content, err := fetchFileContent(ctx, repo, workflowPath)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: fetch content: %v", repo, workflowPath, err))
 			continue
@@ -227,8 +235,8 @@ func scanRepo(repo string) repoScanResult {
 	return result
 }
 
-func listWorkflowPaths(repo string) ([]string, error) {
-	out, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/%s", repo, workflowDirPath))
+func listWorkflowPaths(ctx context.Context, repo string) ([]string, error) {
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/%s", repo, workflowDirPath))
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, nil
@@ -254,8 +262,8 @@ func listWorkflowPaths(repo string) ([]string, error) {
 	return paths, nil
 }
 
-func fetchFileContent(repo, path string) (string, error) {
-	out, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/%s", repo, path))
+func fetchFileContent(ctx context.Context, repo, path string) (string, error) {
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/%s", repo, path))
 	if err != nil {
 		return "", err
 	}
@@ -364,8 +372,8 @@ func buildReport(repoCount, workflowsScanned int, violations []PinViolation) str
 	return buf.String()
 }
 
-func reconcileIssue(repo string, violations []PinViolation, report string) (string, error) {
-	existing, err := findOpenAuditIssue(repo)
+func reconcileIssue(ctx context.Context, repo string, violations []PinViolation, report string) (string, error) {
+	existing, err := findOpenAuditIssue(ctx, repo)
 	if err != nil {
 		return "", err
 	}
@@ -382,7 +390,7 @@ func reconcileIssue(repo string, violations []PinViolation, report string) (stri
 			"",
 			"_Auto-closed by `scripts/audit-action-pins.go`._",
 		}, "\n")
-		_, err := ghOutput("api", fmt.Sprintf("repos/%s/issues/%d", repo, existing.Number), "--method", "PATCH", "-f", "state=closed", "-f", "body="+body)
+		_, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/issues/%d", repo, existing.Number), "--method", "PATCH", "-f", "state=closed", "-f", "body="+body)
 		return "", err
 	}
 
@@ -399,7 +407,7 @@ func reconcileIssue(repo string, violations []PinViolation, report string) (stri
 	}, "\n")
 
 	if existing == nil {
-		out, err := ghOutput(
+		out, err := ghcli.Output(ctx,
 			"api", fmt.Sprintf("repos/%s/issues", repo),
 			"--method", "POST",
 			"-f", "title="+title,
@@ -419,7 +427,7 @@ func reconcileIssue(repo string, violations []PinViolation, report string) (stri
 		return existing.URL, nil
 	}
 
-	_, err = ghOutput(
+	_, err = ghcli.Output(ctx,
 		"api", fmt.Sprintf("repos/%s/issues/%d", repo, existing.Number),
 		"--method", "PATCH",
 		"-f", "title="+title,
@@ -432,8 +440,8 @@ func reconcileIssue(repo string, violations []PinViolation, report string) (stri
 	return existing.URL, nil
 }
 
-func findOpenAuditIssue(repo string) (*issueInfo, error) {
-	out, err := ghOutput("api", fmt.Sprintf("repos/%s/issues?state=open&per_page=100", repo))
+func findOpenAuditIssue(ctx context.Context, repo string) (*issueInfo, error) {
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/issues?state=open&per_page=100", repo))
 	if err != nil {
 		return nil, err
 	}
@@ -473,28 +481,4 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func ghOutput(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found — run from repo root", rel)
-}
-
-func fatal(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", a...)
-	os.Exit(1)
 }

@@ -29,15 +29,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
+	"scripts/internal/ghcli"
 )
 
 // Infrastructure endpoints.
@@ -92,6 +95,11 @@ func main() {
 	skipDependabot := flag.Bool("skip-dependabot", true, "Skip dependabot.yml generation (default: true)")
 	flag.Parse()
 
+	ctx := context.Background()
+	if _, err := ghcli.EnsureBudget(ctx, 100); err != nil {
+		cli.Fatal("rate limit: %v", err)
+	}
+
 	args := flag.Args()
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Usage: go run scripts/onboard-repo.go [flags] <owner/repo>")
@@ -113,8 +121,8 @@ func main() {
 	fmt.Printf("=== Onboard %s [%s] ===\n\n", repo, mode)
 
 	// Validate repo exists.
-	if _, err := ghOutput("repo", "view", repo, "--json", "name", "-q", ".name"); err != nil {
-		fatal("repository %s not found or not accessible: %v", repo, err)
+	if _, err := ghcli.Output(ctx, "repo", "view", repo, "--json", "name", "-q", ".name"); err != nil {
+		cli.Fatal("repository %s not found or not accessible: %v", repo, err)
 	}
 
 	var errs []string
@@ -128,7 +136,7 @@ func main() {
 	}
 
 	if !*skipLabels {
-		if err := stepLabels(repo, apply); err != nil {
+		if err := stepLabels(ctx, repo, apply); err != nil {
 			errs = append(errs, fmt.Sprintf("labels: %v", err))
 		}
 	} else {
@@ -136,7 +144,7 @@ func main() {
 	}
 
 	if !*skipWebhooks {
-		if err := stepWebhooks(repo, apply); err != nil {
+		if err := stepWebhooks(ctx, repo, apply); err != nil {
 			errs = append(errs, fmt.Sprintf("webhooks: %v", err))
 		}
 	} else {
@@ -144,14 +152,14 @@ func main() {
 	}
 
 	if !*skipDependabot {
-		if err := stepDependabot(repo, apply); err != nil {
+		if err := stepDependabot(ctx, repo, apply); err != nil {
 			errs = append(errs, fmt.Sprintf("dependabot: %v", err))
 		}
 	} else {
 		fmt.Println("\n--- Step 4: Dependabot [SKIPPED] ---")
 	}
 
-	stepVerify(repo)
+	stepVerify(ctx, repo)
 
 	// Summary.
 	fmt.Println("\n=== Summary ===")
@@ -183,7 +191,7 @@ func main() {
 func stepSyncYml(repo string, apply bool) error {
 	fmt.Println("--- Step 1: sync.yml ---")
 
-	syncPath, err := resolveFromRoot(syncYmlRel)
+	syncPath, err := fsutil.ResolveFromRoot(syncYmlRel)
 	if err != nil {
 		return err
 	}
@@ -260,10 +268,10 @@ func stepSyncYml(repo string, apply bool) error {
 // Step 2: Labels
 // ---------------------------------------------------------------------------
 
-func stepLabels(repo string, apply bool) error {
+func stepLabels(ctx context.Context, repo string, apply bool) error {
 	fmt.Println("\n--- Step 2: Labels ---")
 
-	labelsPath, err := resolveFromRoot(labelsYmlRel)
+	labelsPath, err := fsutil.ResolveFromRoot(labelsYmlRel)
 	if err != nil {
 		return err
 	}
@@ -273,7 +281,7 @@ func stepLabels(repo string, apply bool) error {
 	}
 
 	// Fetch existing labels.
-	out, err := ghOutput("label", "list", "--repo", repo, "--json", "name,color,description", "--limit", "200")
+	out, err := ghcli.Output(ctx, "label", "list", "--repo", repo, "--json", "name,color,description", "--limit", "200")
 	if err != nil {
 		return fmt.Errorf("list labels: %w", err)
 	}
@@ -315,7 +323,7 @@ func stepLabels(repo string, apply bool) error {
 		if !apply {
 			fmt.Printf("  [dry-run] Would %s: %s\n", action, l.Name)
 		} else {
-			if _, err := ghOutput(ghArgs...); err != nil {
+			if _, err := ghcli.Output(ctx, ghArgs...); err != nil {
 				fmt.Printf("  [error] %s %s: %v\n", action, l.Name, err)
 				continue
 			}
@@ -336,10 +344,10 @@ func stepLabels(repo string, apply bool) error {
 // Step 3: Webhooks
 // ---------------------------------------------------------------------------
 
-func stepWebhooks(repo string, apply bool) error {
+func stepWebhooks(ctx context.Context, repo string, apply bool) error {
 	fmt.Println("\n--- Step 3: Webhooks ---")
 
-	out, err := ghOutput("api", fmt.Sprintf("repos/%s/hooks", repo), "--paginate")
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/hooks", repo), "--paginate")
 	if err != nil {
 		return fmt.Errorf("list hooks: %w", err)
 	}
@@ -392,7 +400,7 @@ func stepWebhooks(repo string, apply bool) error {
 			ghArgs = append(ghArgs, "-f", "events[]="+ev)
 		}
 
-		if _, err := ghOutput(ghArgs...); err != nil {
+		if _, err := ghcli.Output(ctx, ghArgs...); err != nil {
 			fmt.Printf("  [error] %s: %v\n", wh.Name, err)
 			continue
 		}
@@ -408,17 +416,17 @@ func stepWebhooks(repo string, apply bool) error {
 // Step 4: Dependabot
 // ---------------------------------------------------------------------------
 
-func stepDependabot(repo string, apply bool) error {
+func stepDependabot(ctx context.Context, repo string, apply bool) error {
 	fmt.Println("\n--- Step 4: Dependabot ---")
 
 	// Check if already exists.
-	if _, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo), "-q", ".name"); err == nil {
+	if _, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo), "-q", ".name"); err == nil {
 		fmt.Println("  [skip] dependabot.yml already exists")
 		return nil
 	}
 
 	// Detect ecosystems from repo languages.
-	out, err := ghOutput("api", fmt.Sprintf("repos/%s/languages", repo))
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/languages", repo))
 	if err != nil {
 		return fmt.Errorf("get languages: %w", err)
 	}
@@ -436,7 +444,7 @@ func stepDependabot(repo string, apply bool) error {
 	}
 
 	// Check for Dockerfile.
-	if _, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/Dockerfile", repo), "-q", ".name"); err == nil {
+	if _, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/Dockerfile", repo), "-q", ".name"); err == nil {
 		ecosystems["docker"] = true
 	}
 
@@ -462,7 +470,7 @@ func stepDependabot(repo string, apply bool) error {
 	}
 
 	encoded := base64.StdEncoding.EncodeToString([]byte(content))
-	if _, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo),
+	if _, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo),
 		"--method", "PUT",
 		"-f", "message=chore: add dependabot configuration",
 		"-f", "content="+encoded,
@@ -478,11 +486,11 @@ func stepDependabot(repo string, apply bool) error {
 // Step 5: Verify
 // ---------------------------------------------------------------------------
 
-func stepVerify(repo string) {
+func stepVerify(ctx context.Context, repo string) {
 	fmt.Println("\n--- Step 5: Verify ---")
 
 	// sync.yml.
-	syncPath, _ := resolveFromRoot(syncYmlRel)
+	syncPath, _ := fsutil.ResolveFromRoot(syncYmlRel)
 	if data, err := os.ReadFile(syncPath); err == nil {
 		if strings.Contains(string(data), repo) {
 			fmt.Println("  ✓ sync.yml")
@@ -492,7 +500,7 @@ func stepVerify(repo string) {
 	}
 
 	// Labels.
-	out, err := ghOutput("label", "list", "--repo", repo, "--json", "name", "--limit", "200", "-q", "length")
+	out, err := ghcli.Output(ctx, "label", "list", "--repo", repo, "--json", "name", "--limit", "200", "-q", "length")
 	if err == nil {
 		fmt.Printf("  ✓ Labels: %s\n", out)
 	} else {
@@ -500,7 +508,7 @@ func stepVerify(repo string) {
 	}
 
 	// Webhooks.
-	out, err = ghOutput("api", fmt.Sprintf("repos/%s/hooks", repo), "--paginate", "-q", "length")
+	out, err = ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/hooks", repo), "--paginate", "-q", "length")
 	if err == nil {
 		fmt.Printf("  ✓ Webhooks: %s\n", out)
 	} else {
@@ -508,7 +516,7 @@ func stepVerify(repo string) {
 	}
 
 	// Dependabot.
-	if _, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo), "-q", ".name"); err == nil {
+	if _, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/.github/dependabot.yml", repo), "-q", ".name"); err == nil {
 		fmt.Println("  ✓ dependabot.yml")
 	} else {
 		fmt.Println("  ✗ dependabot.yml (not found)")
@@ -559,27 +567,3 @@ func unquote(s string) string {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-func ghOutput(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found — run from repo root", rel)
-}
-
-func fatal(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", a...)
-	os.Exit(1)
-}

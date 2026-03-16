@@ -18,16 +18,18 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
+	"scripts/internal/ghcli"
 )
 
 const (
@@ -59,20 +61,25 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
 
-	labelsPath, err := resolveFromRoot(labelsFile)
+	ctx := context.Background()
+	if _, err := ghcli.EnsureBudget(ctx, 200); err != nil {
+		cli.Fatal("rate limit: %v", err)
+	}
+
+	labelsPath, err := fsutil.ResolveFromRoot(labelsFile)
 	if err != nil {
-		fatal("labels.yml: %v", err)
+		cli.Fatal("labels.yml: %v", err)
 	}
 	standard, err := parseLabelsYml(labelsPath)
 	if err != nil {
-		fatal("parse labels.yml: %v", err)
+		cli.Fatal("parse labels.yml: %v", err)
 	}
 	logVerbose(*verbose, "Loaded %d labels from %s", len(standard), labelsPath)
 	fmt.Printf("Loaded %d standard labels from %s\n", len(standard), labelsFile)
 
-	repos, err := targetRepos(*singleRepo)
+	repos, err := targetRepos(ctx, *singleRepo)
 	if err != nil {
-		fatal("list repos: %v", err)
+		cli.Fatal("list repos: %v", err)
 	}
 	logVerbose(*verbose, "Found %d repositories", len(repos))
 	fmt.Printf("Targets: %d repo(s)\n\n", len(repos))
@@ -104,7 +111,7 @@ func main() {
 			defer wg.Done()
 			for repo := range ch {
 				logVerbose(*verbose, "Processing repo: %s", repo)
-				res := syncRepo(repo, standard, *dryRun, *deleteStale, *verbose)
+				res := syncRepo(ctx, repo, standard, *dryRun, *deleteStale, *verbose)
 				mu.Lock()
 				results = append(results, res)
 				mu.Unlock()
@@ -133,13 +140,13 @@ func main() {
 }
 
 // syncRepo syncs labels for a single repo and returns the result.
-func syncRepo(repo string, standard []label, dryRun, deleteStale, verbose bool) repoResult {
+func syncRepo(ctx context.Context, repo string, standard []label, dryRun, deleteStale, verbose bool) repoResult {
 	res := repoResult{Repo: repo, Total: len(standard)}
 
 	logVerbose(verbose, "Syncing labels for %s", repo)
 
 	// Fetch existing labels.
-	out, err := ghOutput("label", "list", "--repo", repo, "--json", "name,color,description", "--limit", "200")
+	out, err := ghcli.Output(ctx, "label", "list", "--repo", repo, "--json", "name,color,description", "--limit", "200")
 	if err != nil {
 		res.Errors = append(res.Errors, fmt.Sprintf("list: %v", err))
 		return res
@@ -189,7 +196,7 @@ func syncRepo(repo string, standard []label, dryRun, deleteStale, verbose bool) 
 			continue
 		}
 
-		if _, err := ghOutput(ghArgs...); err != nil {
+		if _, err := ghcli.Output(ctx, ghArgs...); err != nil {
 			res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", l.Name, err))
 			continue
 		}
@@ -214,7 +221,7 @@ func syncRepo(repo string, standard []label, dryRun, deleteStale, verbose bool) 
 				res.Deleted++
 				continue
 			}
-			if _, err := ghOutput("label", "delete", l.Name, "--repo", repo, "--yes"); err != nil {
+			if _, err := ghcli.Output(ctx, "label", "delete", l.Name, "--repo", repo, "--yes"); err != nil {
 				res.Errors = append(res.Errors, fmt.Sprintf("delete %s: %v", l.Name, err))
 				continue
 			}
@@ -226,7 +233,7 @@ func syncRepo(repo string, standard []label, dryRun, deleteStale, verbose bool) 
 	return res
 }
 
-func targetRepos(single string) ([]string, error) {
+func targetRepos(ctx context.Context, single string) ([]string, error) {
 	if single != "" {
 		if !strings.Contains(single, "/") {
 			single = org + "/" + single
@@ -234,7 +241,7 @@ func targetRepos(single string) ([]string, error) {
 		return []string{single}, nil
 	}
 
-	out, err := ghOutput("repo", "list", org, "--json", "nameWithOwner", "--limit", "100", "-q", ".[].nameWithOwner")
+	out, err := ghcli.Output(ctx, "repo", "list", org, "--json", "nameWithOwner", "--limit", "100", "-q", ".[].nameWithOwner")
 	if err != nil {
 		return nil, err
 	}
@@ -345,28 +352,4 @@ func logVerbose(verbose bool, format string, v ...interface{}) {
 	if verbose {
 		fmt.Fprintf(os.Stderr, "[VERBOSE] "+format+"\n", v...)
 	}
-}
-
-func ghOutput(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found — run from repo root", rel)
-}
-
-func fatal(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", a...)
-	os.Exit(1)
 }

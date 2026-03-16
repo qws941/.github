@@ -15,6 +15,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"scripts/internal/cli"
 )
 
 const (
@@ -83,7 +85,7 @@ func main() {
 
 	targetRepos, err := resolveTargetRepos(*singleRepo)
 	if err != nil {
-		fatal("invalid repo target: %v", err)
+		cli.Fatal("invalid repo target: %v", err)
 	}
 
 	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
@@ -91,7 +93,7 @@ func main() {
 		token = strings.TrimSpace(os.Getenv("GH_PAT"))
 	}
 	if token == "" && !*dryRun {
-		fatal("missing token: set GITHUB_TOKEN or GH_PAT")
+		cli.Fatal("missing token: set GITHUB_TOKEN or GH_PAT")
 	}
 
 	mode := "DRY-RUN"
@@ -274,9 +276,4 @@ func urlPathEscape(s string) string {
 		"?", "%3F",
 	)
 	return replacer.Replace(s)
-}
-
-func fatal(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
-	os.Exit(1)
 }

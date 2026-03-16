@@ -23,6 +23,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
 )
 
 const (
@@ -55,8 +58,8 @@ type scanTarget struct {
 
 // Quoted label patterns for workflow YAML files.
 var labelPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`['"]([a-z]+:[a-z][-a-z]*)['"]`),                    // type:bug, status:in-progress, priority:high, risk:low
-	regexp.MustCompile(`['"]size/(xs|s|m|l|xl)['"]`),                       // size/xs .. size/xl
+	regexp.MustCompile(`['"]([a-z]+:[a-z][-a-z]*)['"]`),                             // type:bug, status:in-progress, priority:high, risk:low
+	regexp.MustCompile(`['"]size/(xs|s|m|l|xl)['"]`),                                // size/xs .. size/xl
 	regexp.MustCompile(`['"](auto-merge|opencode-agent|sync|keep-open|pinned)['"]`), // bare automation labels
 }
 
@@ -113,15 +116,15 @@ func main() {
 	flag.Parse()
 
 	// Resolve labels.yml from repo root.
-	labelsPath, err := resolveFromRoot(labelsFile)
+	labelsPath, err := fsutil.ResolveFromRoot(labelsFile)
 	if err != nil {
-		fatal("labels.yml: %v", err)
+		cli.Fatal("labels.yml: %v", err)
 	}
 
 	// Parse SSoT labels.
 	labels, err := parseLabelsYml(labelsPath)
 	if err != nil {
-		fatal("parse labels.yml: %v", err)
+		cli.Fatal("parse labels.yml: %v", err)
 	}
 
 	ssot := make(map[string]bool, len(labels))
@@ -137,7 +140,7 @@ func main() {
 	var filesToScan []fileEntry
 
 	for _, target := range scanTargets {
-		targetPath, err := resolveFromRoot(filepath.Dir(target.glob))
+		targetPath, err := fsutil.ResolveFromRoot(filepath.Dir(target.glob))
 		if err != nil {
 			if *verbose {
 				fmt.Fprintf(os.Stderr, "[VERBOSE] Skipping %s: directory not found\n", target.glob)
@@ -171,7 +174,7 @@ func main() {
 	var allRefs []ref
 	var unknown []ref
 
-	githubDir, _ := resolveFromRoot(".github")
+	githubDir, _ := fsutil.ResolveFromRoot(".github")
 
 	for _, fe := range filesToScan {
 		data, err := os.ReadFile(fe.path)
@@ -353,16 +356,3 @@ func unquote(s string) string {
 // ---------------------------------------------------------------------------
 // Helpers (same pattern as sync-labels.go)
 // ---------------------------------------------------------------------------
-
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found — run from repo root", rel)
-}
-
-func fatal(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", a...)
-	os.Exit(1)
-}

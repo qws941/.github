@@ -3,7 +3,7 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
+	"scripts/internal/ghcli"
 )
 
 const (
@@ -107,9 +109,14 @@ func main() {
 	workers := flag.Int("workers", 4, "Concurrent repo validations")
 	flag.Parse()
 
+	ctx := context.Background()
+	if _, err := ghcli.EnsureBudget(ctx, 200); err != nil {
+		cli.Fatal("rate limit: %v", err)
+	}
+
 	repos, err := targetRepos(*singleRepo)
 	if err != nil {
-		fatal("load repos: %v", err)
+		cli.Fatal("load repos: %v", err)
 	}
 
 	mode := "EXECUTE"
@@ -131,15 +138,15 @@ func main() {
 		repoMetadataErr: make(map[string]error),
 	}
 
-	results := validateRepos(repos, validator, *workers)
+	results := validateRepos(ctx, repos, validator, *workers)
 	printSummary(results)
 
-	if err := syncIssues(results, *dryRun); err != nil {
-		fatal("sync issues: %v", err)
+	if err := syncIssues(ctx, results, *dryRun); err != nil {
+		cli.Fatal("sync issues: %v", err)
 	}
 }
 
-func validateRepos(repos []string, validator *ownerValidator, workers int) []repoResult {
+func validateRepos(ctx context.Context, repos []string, validator *ownerValidator, workers int) []repoResult {
 	queue := make(chan string, len(repos))
 	for _, repo := range repos {
 		queue <- repo
@@ -162,7 +169,7 @@ func validateRepos(repos []string, validator *ownerValidator, workers int) []rep
 		go func() {
 			defer wg.Done()
 			for repo := range queue {
-				result := validateRepo(repo, validator)
+				result := validateRepo(ctx, repo, validator)
 				mu.Lock()
 				results = append(results, result)
 				mu.Unlock()
@@ -177,16 +184,16 @@ func validateRepos(repos []string, validator *ownerValidator, workers int) []rep
 	return results
 }
 
-func validateRepo(repo string, validator *ownerValidator) repoResult {
+func validateRepo(ctx context.Context, repo string, validator *ownerValidator) repoResult {
 	result := repoResult{Repo: repo}
 
-	meta, err := validator.metadata(repo)
+	meta, err := validator.metadata(ctx, repo)
 	if err != nil {
 		result.Findings = append(result.Findings, finding{Kind: "repo-api-error", Detail: err.Error()})
 		return result
 	}
 
-	codeownersPath, content, found, err := fetchCodeowners(repo, meta.DefaultBranch)
+	codeownersPath, content, found, err := fetchCodeowners(ctx, repo, meta.DefaultBranch)
 	if err != nil {
 		result.Findings = append(result.Findings, finding{Kind: "codeowners-read-error", Detail: err.Error()})
 		return result
@@ -201,14 +208,14 @@ func validateRepo(repo string, validator *ownerValidator) repoResult {
 	entries, parseFindings := parseCodeowners(content)
 	findings = append(findings, parseFindings...)
 
-	syntaxFindings, err := fetchCodeownersErrors(repo)
+	syntaxFindings, err := fetchCodeownersErrors(ctx, repo)
 	if err != nil {
 		findings = append(findings, finding{Kind: "syntax-api-error", Detail: err.Error()})
 	} else {
 		findings = append(findings, syntaxFindings...)
 	}
 
-	files, err := validator.files(repo, meta.DefaultBranch)
+	files, err := validator.files(ctx, repo, meta.DefaultBranch)
 	if err != nil {
 		findings = append(findings, finding{Kind: "tree-read-error", Detail: err.Error()})
 	} else {
@@ -225,7 +232,7 @@ func validateRepo(repo string, validator *ownerValidator) repoResult {
 
 	for _, entry := range entries {
 		for _, owner := range entry.Owners {
-			ownerFindings := validator.validateOwner(repo, meta, owner, entry.Line)
+			ownerFindings := validator.validateOwner(ctx, repo, meta, owner, entry.Line)
 			findings = append(findings, ownerFindings...)
 		}
 	}
@@ -374,26 +381,26 @@ func ownerKind(owner string) string {
 	}
 }
 
-func (validator *ownerValidator) validateOwner(repo string, meta repoMetadata, owner string, line int) []finding {
+func (validator *ownerValidator) validateOwner(ctx context.Context, repo string, meta repoMetadata, owner string, line int) []finding {
 	switch ownerKind(owner) {
 	case "user":
 		username := strings.TrimPrefix(owner, "@")
-		return validator.validateUserOwner(repo, username, line)
+		return validator.validateUserOwner(ctx, repo, username, line)
 	case "team":
 		match := ownerTeamPattern.FindStringSubmatch(owner)
 		if len(match) != 3 {
 			return nil
 		}
-		return validator.validateTeamOwner(repo, meta, owner, match[1], match[2], line)
+		return validator.validateTeamOwner(ctx, repo, meta, owner, match[1], match[2], line)
 	default:
 		return nil
 	}
 }
 
-func (validator *ownerValidator) validateUserOwner(repo, username string, line int) []finding {
+func (validator *ownerValidator) validateUserOwner(ctx context.Context, repo, username string, line int) []finding {
 	findings := make([]finding, 0)
 
-	exists, err := validator.cachedUserExists(username)
+	exists, err := validator.cachedUserExists(ctx, username)
 	if err != nil {
 		return []finding{{Line: line, Kind: "user-check-error", Detail: fmt.Sprintf("Failed to verify user @%s: %v", username, err)}}
 	}
@@ -401,7 +408,7 @@ func (validator *ownerValidator) validateUserOwner(repo, username string, line i
 		return []finding{{Line: line, Kind: "missing-user", Detail: fmt.Sprintf("User @%s does not exist.", username)}}
 	}
 
-	access, err := validator.cachedUserAccess(repo, username)
+	access, err := validator.cachedUserAccess(ctx, repo, username)
 	if err != nil {
 		findings = append(findings, finding{Line: line, Kind: "user-access-check-error", Detail: fmt.Sprintf("Failed to verify repository access for @%s: %v", username, err)})
 		return findings
@@ -413,7 +420,7 @@ func (validator *ownerValidator) validateUserOwner(repo, username string, line i
 	return findings
 }
 
-func (validator *ownerValidator) validateTeamOwner(repo string, meta repoMetadata, owner, teamOrg, teamSlug string, line int) []finding {
+func (validator *ownerValidator) validateTeamOwner(ctx context.Context, repo string, meta repoMetadata, owner, teamOrg, teamSlug string, line int) []finding {
 	if meta.Owner.Type != "Organization" {
 		return []finding{{
 			Line:   line,
@@ -429,7 +436,7 @@ func (validator *ownerValidator) validateTeamOwner(repo string, meta repoMetadat
 		}}
 	}
 
-	exists, err := validator.cachedTeamExists(teamOrg, teamSlug)
+	exists, err := validator.cachedTeamExists(ctx, teamOrg, teamSlug)
 	if err != nil {
 		return []finding{{Line: line, Kind: "team-check-error", Detail: fmt.Sprintf("Failed to verify team %s: %v", owner, err)}}
 	}
@@ -437,7 +444,7 @@ func (validator *ownerValidator) validateTeamOwner(repo string, meta repoMetadat
 		return []finding{{Line: line, Kind: "missing-team", Detail: fmt.Sprintf("Team %s does not exist.", owner)}}
 	}
 
-	access, err := validator.cachedTeamRepoAccess(teamOrg, teamSlug, repo)
+	access, err := validator.cachedTeamRepoAccess(ctx, teamOrg, teamSlug, repo)
 	if err != nil {
 		return []finding{{Line: line, Kind: "team-access-check-error", Detail: fmt.Sprintf("Failed to verify repository access for %s: %v", owner, err)}}
 	}
@@ -448,7 +455,7 @@ func (validator *ownerValidator) validateTeamOwner(repo string, meta repoMetadat
 	return nil
 }
 
-func (validator *ownerValidator) metadata(repo string) (repoMetadata, error) {
+func (validator *ownerValidator) metadata(ctx context.Context, repo string) (repoMetadata, error) {
 	validator.mu.Lock()
 	meta, ok := validator.repoMetadata[repo]
 	err, hasErr := validator.repoMetadataErr[repo]
@@ -458,7 +465,10 @@ func (validator *ownerValidator) metadata(repo string) (repoMetadata, error) {
 	}
 
 	var fetched repoMetadata
-	err = ghJSON(&fetched, "api", fmt.Sprintf("repos/%s", repo))
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s", repo))
+	if err == nil && out != "" {
+		_ = json.Unmarshal([]byte(out), &fetched)
+	}
 
 	validator.mu.Lock()
 	defer validator.mu.Unlock()
@@ -467,7 +477,7 @@ func (validator *ownerValidator) metadata(repo string) (repoMetadata, error) {
 	return fetched, err
 }
 
-func (validator *ownerValidator) files(repo, branch string) ([]string, error) {
+func (validator *ownerValidator) files(ctx context.Context, repo, branch string) ([]string, error) {
 	validator.mu.Lock()
 	files, ok := validator.repoFiles[repo]
 	err, hasErr := validator.repoFilesErr[repo]
@@ -477,7 +487,11 @@ func (validator *ownerValidator) files(repo, branch string) ([]string, error) {
 	}
 
 	var tree treeResponse
-	err = ghJSON(&tree, "api", fmt.Sprintf("repos/%s/git/trees/%s?recursive=1", repo, branch))
+	out, fetchErr := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/git/trees/%s?recursive=1", repo, branch))
+	if fetchErr == nil && out != "" {
+		_ = json.Unmarshal([]byte(out), &tree)
+	}
+	err = fetchErr
 	if err == nil {
 		files = make([]string, 0, len(tree.Tree))
 		for _, node := range tree.Tree {
@@ -495,7 +509,7 @@ func (validator *ownerValidator) files(repo, branch string) ([]string, error) {
 	return files, err
 }
 
-func (validator *ownerValidator) cachedUserExists(username string) (bool, error) {
+func (validator *ownerValidator) cachedUserExists(ctx context.Context, username string) (bool, error) {
 	validator.mu.Lock()
 	value, ok := validator.userExists[username]
 	validator.mu.Unlock()
@@ -503,7 +517,7 @@ func (validator *ownerValidator) cachedUserExists(username string) (bool, error)
 		return value, nil
 	}
 
-	err := ghJSON(&struct{}{}, "api", fmt.Sprintf("users/%s", username))
+	_, err := ghcli.Output(ctx, "api", fmt.Sprintf("users/%s", username))
 	if err != nil {
 		if isNotFound(err) {
 			validator.mu.Lock()
@@ -520,7 +534,7 @@ func (validator *ownerValidator) cachedUserExists(username string) (bool, error)
 	return true, nil
 }
 
-func (validator *ownerValidator) cachedUserAccess(repo, username string) (bool, error) {
+func (validator *ownerValidator) cachedUserAccess(ctx context.Context, repo, username string) (bool, error) {
 	key := repo + "|" + username
 	validator.mu.Lock()
 	value, ok := validator.userAccess[key]
@@ -529,7 +543,7 @@ func (validator *ownerValidator) cachedUserAccess(repo, username string) (bool, 
 		return value, nil
 	}
 
-	err := ghJSON(&struct{}{}, "api", fmt.Sprintf("repos/%s/collaborators/%s/permission", repo, username))
+	_, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/collaborators/%s/permission", repo, username))
 	if err != nil {
 		if isNotFound(err) {
 			validator.mu.Lock()
@@ -546,7 +560,7 @@ func (validator *ownerValidator) cachedUserAccess(repo, username string) (bool, 
 	return true, nil
 }
 
-func (validator *ownerValidator) cachedTeamExists(org, slug string) (bool, error) {
+func (validator *ownerValidator) cachedTeamExists(ctx context.Context, org, slug string) (bool, error) {
 	key := org + "/" + slug
 	validator.mu.Lock()
 	value, ok := validator.teamExists[key]
@@ -555,7 +569,7 @@ func (validator *ownerValidator) cachedTeamExists(org, slug string) (bool, error
 		return value, nil
 	}
 
-	err := ghJSON(&struct{}{}, "api", fmt.Sprintf("orgs/%s/teams/%s", org, slug))
+	_, err := ghcli.Output(ctx, "api", fmt.Sprintf("orgs/%s/teams/%s", org, slug))
 	if err != nil {
 		if isNotFound(err) {
 			validator.mu.Lock()
@@ -572,7 +586,7 @@ func (validator *ownerValidator) cachedTeamExists(org, slug string) (bool, error
 	return true, nil
 }
 
-func (validator *ownerValidator) cachedTeamRepoAccess(org, slug, repo string) (bool, error) {
+func (validator *ownerValidator) cachedTeamRepoAccess(ctx context.Context, org, slug, repo string) (bool, error) {
 	key := org + "/" + slug + "|" + repo
 	validator.mu.Lock()
 	value, ok := validator.teamRepoAccess[key]
@@ -581,7 +595,7 @@ func (validator *ownerValidator) cachedTeamRepoAccess(org, slug, repo string) (b
 		return value, nil
 	}
 
-	err := ghJSON(&struct{}{}, "api", fmt.Sprintf("orgs/%s/teams/%s/repos/%s", org, slug, repo))
+	_, err := ghcli.Output(ctx, "api", fmt.Sprintf("orgs/%s/teams/%s/repos/%s", org, slug, repo))
 	if err != nil {
 		if isNotFound(err) {
 			validator.mu.Lock()
@@ -598,9 +612,9 @@ func (validator *ownerValidator) cachedTeamRepoAccess(org, slug, repo string) (b
 	return true, nil
 }
 
-func fetchCodeowners(repo, branch string) (string, string, bool, error) {
+func fetchCodeowners(ctx context.Context, repo, branch string) (string, string, bool, error) {
 	for _, path := range codeownersPaths {
-		out, err := ghOutput("api", "-H", "Accept: application/vnd.github.raw+json", fmt.Sprintf("repos/%s/contents/%s?ref=%s", repo, url.PathEscape(path), url.QueryEscape(branch)))
+		out, err := ghcli.Output(ctx, "api", "-H", "Accept: application/vnd.github.raw+json", fmt.Sprintf("repos/%s/contents/%s?ref=%s", repo, url.PathEscape(path), url.QueryEscape(branch)))
 		if err == nil {
 			return path, out, true, nil
 		}
@@ -612,14 +626,19 @@ func fetchCodeowners(repo, branch string) (string, string, bool, error) {
 	return "", "", false, nil
 }
 
-func fetchCodeownersErrors(repo string) ([]finding, error) {
+func fetchCodeownersErrors(ctx context.Context, repo string) ([]finding, error) {
 	var response codeownersErrorsResponse
-	err := ghJSON(&response, "api", fmt.Sprintf("repos/%s/codeowners/errors", repo))
+	out, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/codeowners/errors", repo))
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if out != "" {
+		if jsonErr := json.Unmarshal([]byte(out), &response); jsonErr != nil {
+			return nil, fmt.Errorf("parse JSON: %w", jsonErr)
+		}
 	}
 
 	findings := make([]finding, 0, len(response.Errors))
@@ -645,7 +664,7 @@ func targetRepos(single string) ([]string, error) {
 		return []string{single}, nil
 	}
 
-	syncPath, err := resolveFromRoot(syncConfigPath)
+	syncPath, err := fsutil.ResolveFromRoot(syncConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -675,8 +694,8 @@ func targetRepos(single string) ([]string, error) {
 	return repos, nil
 }
 
-func syncIssues(results []repoResult, dryRun bool) error {
-	openIssues, err := listOpenIssues()
+func syncIssues(ctx context.Context, results []repoResult, dryRun bool) error {
+	openIssues, err := listOpenIssues(ctx)
 	if err != nil {
 		return err
 	}
@@ -700,7 +719,7 @@ func syncIssues(results []repoResult, dryRun bool) error {
 				continue
 			}
 			comment := fmt.Sprintf("CODEOWNERS validation recovered for `%s`. No violations remain.", result.Repo)
-			if _, err := ghOutput("issue", "close", fmt.Sprintf("%d", existing.Number), "--repo", issueRepo, "--comment", comment); err != nil {
+			if _, err := ghcli.Output(ctx, "issue", "close", fmt.Sprintf("%d", existing.Number), "--repo", issueRepo, "--comment", comment); err != nil {
 				return err
 			}
 			fmt.Printf("[closed] %s -> issue #%d\n", result.Repo, existing.Number)
@@ -724,14 +743,14 @@ func syncIssues(results []repoResult, dryRun bool) error {
 		}
 
 		if hasIssue {
-			if _, err := ghOutput("issue", "edit", fmt.Sprintf("%d", existing.Number), "--repo", issueRepo, "--title", title, "--body", body); err != nil {
+			if _, err := ghcli.Output(ctx, "issue", "edit", fmt.Sprintf("%d", existing.Number), "--repo", issueRepo, "--title", title, "--body", body); err != nil {
 				return err
 			}
 			fmt.Printf("[updated] %s -> issue #%d\n", result.Repo, existing.Number)
 			continue
 		}
 
-		if _, err := ghOutput("issue", "create", "--repo", issueRepo, "--title", title, "--body", body); err != nil {
+		if _, err := ghcli.Output(ctx, "issue", "create", "--repo", issueRepo, "--title", title, "--body", body); err != nil {
 			return err
 		}
 		fmt.Printf("[created] %s\n", result.Repo)
@@ -740,11 +759,16 @@ func syncIssues(results []repoResult, dryRun bool) error {
 	return nil
 }
 
-func listOpenIssues() ([]issueRecord, error) {
-	var issues []issueRecord
-	err := ghJSON(&issues, "issue", "list", "--repo", issueRepo, "--state", "open", "--limit", "100", "--json", "number,title,body")
+func listOpenIssues(ctx context.Context) ([]issueRecord, error) {
+	out, err := ghcli.Output(ctx, "issue", "list", "--repo", issueRepo, "--state", "open", "--limit", "100", "--json", "number,title,body")
 	if err != nil {
 		return nil, err
+	}
+	var issues []issueRecord
+	if out != "" {
+		if jsonErr := json.Unmarshal([]byte(out), &issues); jsonErr != nil {
+			return nil, fmt.Errorf("parse JSON: %w", jsonErr)
+		}
 	}
 	return issues, nil
 }
@@ -860,53 +884,10 @@ func printSummary(results []repoResult) {
 	fmt.Printf("Summary: %d valid, %d missing, %d with violations\n", cleanCount, missingCount, violationCount)
 }
 
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found; run from repo root", rel)
-}
-
-func ghJSON(target any, args ...string) error {
-	output, err := ghOutput(args...)
-	if err != nil {
-		return err
-	}
-	if output == "" {
-		return nil
-	}
-	if err := json.Unmarshal([]byte(output), target); err != nil {
-		return fmt.Errorf("parse JSON: %w", err)
-	}
-	return nil
-}
-
-func ghOutput(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		message := strings.TrimSpace(stderr.String())
-		if message == "" {
-			message = err.Error()
-		}
-		return "", fmt.Errorf("%s", message)
-	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
 func isNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
 	message := err.Error()
 	return strings.Contains(message, "HTTP 404") || strings.Contains(message, "Not Found")
-}
-
-func fatal(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
-	os.Exit(1)
 }

@@ -1,18 +1,20 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+
+	"scripts/internal/cli"
+	"scripts/internal/fsutil"
+	"scripts/internal/ghcli"
 )
 
 const syncConfigRel = ".github/sync.yml"
@@ -70,19 +72,24 @@ func main() {
 	workers := flag.Int("workers", 6, "Parallel workers")
 	flag.Parse()
 
-	syncPath, err := resolveFromRoot(syncConfigRel)
+	ctx := context.Background()
+	if _, err := ghcli.EnsureBudget(ctx, 50); err != nil {
+		cli.Fatal("rate limit: %v", err)
+	}
+
+	syncPath, err := fsutil.ResolveFromRoot(syncConfigRel)
 	if err != nil {
-		fatal("sync config: %v", err)
+		cli.Fatal("sync config: %v", err)
 	}
 
 	config, err := parseSyncConfig(syncPath)
 	if err != nil {
-		fatal("parse sync config: %v", err)
+		cli.Fatal("parse sync config: %v", err)
 	}
 
 	plan, err := buildPlan(config)
 	if err != nil {
-		fatal("build sync plan: %v", err)
+		cli.Fatal("build sync plan: %v", err)
 	}
 
 	report := previewReport{
@@ -90,7 +97,7 @@ func main() {
 		FilesToSync:        len(plan.files),
 	}
 
-	results := previewRepos(plan, max(1, *workers))
+	results := previewRepos(ctx, plan, max(1, *workers))
 	for _, repo := range results {
 		if len(repo.Changes) > 0 {
 			report.UpdatedRepos++
@@ -103,7 +110,7 @@ func main() {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(report); err != nil {
-			fatal("encode json: %v", err)
+			cli.Fatal("encode json: %v", err)
 		}
 		return
 	}
@@ -174,7 +181,7 @@ func buildPlan(config syncConfig) (previewPlan, error) {
 	return previewPlan{files: files, repos: repos}, nil
 }
 
-func previewRepos(plan previewPlan, workers int) []repoPreview {
+func previewRepos(ctx context.Context, plan previewPlan, workers int) []repoPreview {
 	jobs := make(chan string, len(plan.repos))
 	for _, repo := range plan.repos {
 		jobs <- repo
@@ -189,7 +196,7 @@ func previewRepos(plan previewPlan, workers int) []repoPreview {
 		go func() {
 			defer wg.Done()
 			for repo := range jobs {
-				results <- previewRepo(repo, plan.files)
+				results <- previewRepo(ctx, repo, plan.files)
 			}
 		}()
 	}
@@ -207,10 +214,10 @@ func previewRepos(plan previewPlan, workers int) []repoPreview {
 	return previews
 }
 
-func previewRepo(repo string, files []plannedFile) repoPreview {
+func previewRepo(ctx context.Context, repo string, files []plannedFile) repoPreview {
 	result := repoPreview{Repo: repo}
 	for _, file := range files {
-		content, err := downstreamFile(repo, file.DestPath)
+		content, err := downstreamFile(ctx, repo, file.DestPath)
 		if err != nil {
 			result.Error = err.Error()
 			return result
@@ -240,8 +247,8 @@ func previewRepo(repo string, files []plannedFile) repoPreview {
 	return result
 }
 
-func downstreamFile(repo, path string) (*downstreamContent, error) {
-	output, err := ghOutput("api", fmt.Sprintf("repos/%s/contents/%s", repo, path))
+func downstreamFile(ctx context.Context, repo, path string) (*downstreamContent, error) {
+	output, err := ghcli.Output(ctx, "api", fmt.Sprintf("repos/%s/contents/%s", repo, path))
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, nil
@@ -380,31 +387,6 @@ func shortSHA(sha string) string {
 		return sha[:7]
 	}
 	return sha
-}
-
-func ghOutput(args ...string) (string, error) {
-	cmd := exec.Command("gh", args...)
-	cmd.Env = os.Environ()
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-func resolveFromRoot(rel string) (string, error) {
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs, nil
-	}
-	return "", fmt.Errorf("%s not found — run from repo root", rel)
-}
-
-func fatal(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", a...)
-	os.Exit(1)
 }
 
 func max(a, b int) int {
