@@ -41,6 +41,7 @@ import (
 	"scripts/internal/cli"
 	"scripts/internal/fsutil"
 	"scripts/internal/ghcli"
+	"scripts/internal/labels"
 )
 
 // Infrastructure endpoints.
@@ -51,12 +52,6 @@ const (
 	labelsYmlRel = "scripts/labels.yml"
 	agentsMdRel  = "AGENTS.md"
 )
-
-type label struct {
-	Name        string
-	Color       string
-	Description string
-}
 
 type webhookDef struct {
 	Name   string
@@ -275,7 +270,7 @@ func stepLabels(ctx context.Context, repo string, apply bool) error {
 	if err != nil {
 		return err
 	}
-	labels, err := parseLabelsYml(labelsPath)
+	standardLabels, err := labels.ParseFile(labelsPath)
 	if err != nil {
 		return fmt.Errorf("parse labels.yml: %w", err)
 	}
@@ -303,7 +298,7 @@ func stepLabels(ctx context.Context, repo string, apply bool) error {
 
 	created, updated, skipped := 0, 0, 0
 
-	for _, l := range labels {
+	for _, l := range standardLabels {
 		ex, exists := exMap[l.Name]
 		if exists && strings.EqualFold(ex.Color, l.Color) && ex.Desc == l.Description {
 			skipped++
@@ -336,7 +331,7 @@ func stepLabels(ctx context.Context, repo string, apply bool) error {
 		}
 	}
 
-	fmt.Printf("  Created: %d, Updated: %d, Unchanged: %d (of %d)\n", created, updated, skipped, len(labels))
+	fmt.Printf("  Created: %d, Updated: %d, Unchanged: %d (of %d)\n", created, updated, skipped, len(standardLabels))
 	return nil
 }
 
@@ -521,47 +516,6 @@ func stepVerify(ctx context.Context, repo string) {
 	} else {
 		fmt.Println("  ✗ dependabot.yml (not found)")
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Label YAML parser (stdlib-only, no gopkg.in/yaml.v3)
-// ---------------------------------------------------------------------------
-
-func parseLabelsYml(path string) ([]label, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var labels []label
-	var cur *label
-
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(trimmed, "- name:"):
-			if cur != nil {
-				labels = append(labels, *cur)
-			}
-			cur = &label{Name: unquote(strings.TrimPrefix(trimmed, "- name:"))}
-		case strings.HasPrefix(trimmed, "color:") && cur != nil:
-			cur.Color = unquote(strings.TrimPrefix(trimmed, "color:"))
-		case strings.HasPrefix(trimmed, "description:") && cur != nil:
-			cur.Description = unquote(strings.TrimPrefix(trimmed, "description:"))
-		}
-	}
-	if cur != nil {
-		labels = append(labels, *cur)
-	}
-	return labels, nil
-}
-
-func unquote(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
 }
 
 // ---------------------------------------------------------------------------

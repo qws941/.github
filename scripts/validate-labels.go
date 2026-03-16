@@ -26,6 +26,7 @@ import (
 
 	"scripts/internal/cli"
 	"scripts/internal/fsutil"
+	"scripts/internal/labels"
 )
 
 const (
@@ -122,14 +123,14 @@ func main() {
 	}
 
 	// Parse SSoT labels.
-	labels, err := parseLabelsYml(labelsPath)
+	parsedLabels, err := labels.ParseFile(labelsPath)
 	if err != nil {
 		cli.Fatal("parse labels.yml: %v", err)
 	}
 
-	ssot := make(map[string]bool, len(labels))
-	for _, l := range labels {
-		ssot[l.name] = true
+	ssot := make(map[string]bool, len(parsedLabels))
+	for _, l := range parsedLabels {
+		ssot[l.Name] = true
 	}
 
 	if *verbose {
@@ -319,38 +320,9 @@ func main() {
 // Label YAML parser (stdlib-only, matches sync-labels.go)
 // ---------------------------------------------------------------------------
 
-type labelEntry struct {
-	name string
-}
-
 type fileEntry struct {
 	path string
 	mode scanMode
-}
-
-func parseLabelsYml(path string) ([]labelEntry, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var labels []labelEntry
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "- name:") {
-			name := unquote(strings.TrimPrefix(trimmed, "- name:"))
-			labels = append(labels, labelEntry{name: name})
-		}
-	}
-	return labels, nil
-}
-
-func unquote(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
 }
 
 // ---------------------------------------------------------------------------

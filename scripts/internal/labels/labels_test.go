@@ -1,18 +1,15 @@
-//go:build onboard_repo
-
-package main
+package labels
 
 import (
 	"os"
 	"path/filepath"
-	"scripts/internal/labels"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestOnboardRepoParseLabelsYmlParsesQuotedUnquotedAndComments(t *testing.T) {
-	path := writeOnboardRepoFixture(t, `# Test labels
+func TestParseFileParsesQuotedUnquotedAndComments(t *testing.T) {
+	path := writeFixture(t, `# Test labels
 - name: bug
   color: d73a4a
   description: Something isn't working
@@ -21,7 +18,7 @@ func TestOnboardRepoParseLabelsYmlParsesQuotedUnquotedAndComments(t *testing.T) 
   description: "New feature or request"
 `)
 
-	got, err := labels.ParseFile(path)
+	got, err := ParseFile(path)
 	if err != nil {
 		t.Fatalf("ParseFile returned error: %v", err)
 	}
@@ -36,8 +33,8 @@ func TestOnboardRepoParseLabelsYmlParsesQuotedUnquotedAndComments(t *testing.T) 
 	}
 }
 
-func TestOnboardRepoParseLabelsYmlHandlesMultilineSpecialCharactersAndMissingFields(t *testing.T) {
-	path := writeOnboardRepoFixture(t, `- name: docs
+func TestParseFileHandlesMultilineSpecialCharactersAndMissingFields(t *testing.T) {
+	path := writeFixture(t, `- name: docs
   color: "#ABCDEF"
   description: |
     First line: keep punctuation [] {} : # !
@@ -46,7 +43,7 @@ func TestOnboardRepoParseLabelsYmlHandlesMultilineSpecialCharactersAndMissingFie
   description: ""
 `)
 
-	got, err := labels.ParseFile(path)
+	got, err := ParseFile(path)
 	if err != nil {
 		t.Fatalf("ParseFile returned error: %v", err)
 	}
@@ -64,10 +61,10 @@ func TestOnboardRepoParseLabelsYmlHandlesMultilineSpecialCharactersAndMissingFie
 	}
 }
 
-func TestOnboardRepoParseLabelsYmlHandlesEmptyFile(t *testing.T) {
-	path := writeOnboardRepoFixture(t, "")
+func TestParseFileHandlesEmptyFile(t *testing.T) {
+	path := writeFixture(t, "")
 
-	got, err := labels.ParseFile(path)
+	got, err := ParseFile(path)
 	if err != nil {
 		t.Fatalf("ParseFile returned error: %v", err)
 	}
@@ -76,13 +73,13 @@ func TestOnboardRepoParseLabelsYmlHandlesEmptyFile(t *testing.T) {
 	}
 }
 
-func TestOnboardRepoParseLabelsYmlRejectsEmptyName(t *testing.T) {
-	path := writeOnboardRepoFixture(t, `- name: ""
+func TestParseFileRejectsEmptyName(t *testing.T) {
+	path := writeFixture(t, `- name: ""
   color: ff0000
   description: invalid
 `)
 
-	_, err := labels.ParseFile(path)
+	_, err := ParseFile(path)
 	if err == nil {
 		t.Fatal("expected error for empty name")
 	}
@@ -91,14 +88,14 @@ func TestOnboardRepoParseLabelsYmlRejectsEmptyName(t *testing.T) {
 	}
 }
 
-func TestOnboardRepoParseLabelsYmlPerformance(t *testing.T) {
-	path := writeOnboardRepoFixture(t, `- name: bug
+func TestParseFilePerformance(t *testing.T) {
+	path := writeFixture(t, `- name: bug
   color: "#ff0000"
   description: fast enough
 `)
 
 	start := time.Now()
-	_, err := labels.ParseFile(path)
+	_, err := ParseFile(path)
 	if err != nil {
 		t.Fatalf("ParseFile returned error: %v", err)
 	}
@@ -107,7 +104,27 @@ func TestOnboardRepoParseLabelsYmlPerformance(t *testing.T) {
 	}
 }
 
-func writeOnboardRepoFixture(t *testing.T, content string) string {
+func TestUnquote(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "double quoted", in: ` "value" `, want: "value"},
+		{name: "single quoted", in: " 'value' ", want: "value"},
+		{name: "unquoted", in: " value ", want: "value"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Unquote(tc.in); got != tc.want {
+				t.Fatalf("Unquote(%q)=%q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func writeFixture(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "labels.yml")
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {

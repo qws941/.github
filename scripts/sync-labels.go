@@ -30,18 +30,13 @@ import (
 	"scripts/internal/cli"
 	"scripts/internal/fsutil"
 	"scripts/internal/ghcli"
+	"scripts/internal/labels"
 )
 
 const (
 	labelsFile = "scripts/labels.yml"
 	org        = "qws941"
 )
-
-type label struct {
-	Name        string
-	Color       string
-	Description string
-}
 
 type repoResult struct {
 	Repo    string
@@ -70,7 +65,7 @@ func main() {
 	if err != nil {
 		cli.Fatal("labels.yml: %v", err)
 	}
-	standard, err := parseLabelsYml(labelsPath)
+	standard, err := labels.ParseFile(labelsPath)
 	if err != nil {
 		cli.Fatal("parse labels.yml: %v", err)
 	}
@@ -140,7 +135,7 @@ func main() {
 }
 
 // syncRepo syncs labels for a single repo and returns the result.
-func syncRepo(ctx context.Context, repo string, standard []label, dryRun, deleteStale, verbose bool) repoResult {
+func syncRepo(ctx context.Context, repo string, standard []labels.Label, dryRun, deleteStale, verbose bool) repoResult {
 	res := repoResult{Repo: repo, Total: len(standard)}
 
 	logVerbose(verbose, "Syncing labels for %s", repo)
@@ -300,47 +295,6 @@ func printSummary(results []repoResult) {
 			}
 		}
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Label YAML parser (stdlib-only)
-// ---------------------------------------------------------------------------
-
-func parseLabelsYml(path string) ([]label, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var labels []label
-	var cur *label
-
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(trimmed, "- name:"):
-			if cur != nil {
-				labels = append(labels, *cur)
-			}
-			cur = &label{Name: unquote(strings.TrimPrefix(trimmed, "- name:"))}
-		case strings.HasPrefix(trimmed, "color:") && cur != nil:
-			cur.Color = unquote(strings.TrimPrefix(trimmed, "color:"))
-		case strings.HasPrefix(trimmed, "description:") && cur != nil:
-			cur.Description = unquote(strings.TrimPrefix(trimmed, "description:"))
-		}
-	}
-	if cur != nil {
-		labels = append(labels, *cur)
-	}
-	return labels, nil
-}
-
-func unquote(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"scripts/internal/labels"
 	"strings"
 	"testing"
 	"time"
@@ -20,18 +21,18 @@ func TestSyncLabelsParseLabelsYmlParsesQuotedUnquotedAndComments(t *testing.T) {
   description: "New feature or request"
 `)
 
-	labels, err := parseLabelsYml(path)
+	got, err := labels.ParseFile(path)
 	if err != nil {
-		t.Fatalf("parseLabelsYml returned error: %v", err)
+		t.Fatalf("ParseFile returned error: %v", err)
 	}
-	if len(labels) != 2 {
-		t.Fatalf("expected 2 labels, got %d", len(labels))
+	if len(got) != 2 {
+		t.Fatalf("expected 2 labels, got %d", len(got))
 	}
-	if labels[0].Name != "bug" || labels[0].Color != "d73a4a" || labels[0].Description != "Something isn't working" {
-		t.Fatalf("unexpected first label: %#v", labels[0])
+	if got[0].Name != "bug" || got[0].Color != "d73a4a" || got[0].Description != "Something isn't working" {
+		t.Fatalf("unexpected first label: %#v", got[0])
 	}
-	if labels[1].Name != "enhancement" || labels[1].Color != "a2eeef" || labels[1].Description != "New feature or request" {
-		t.Fatalf("unexpected second label: %#v", labels[1])
+	if got[1].Name != "enhancement" || got[1].Color != "a2eeef" || got[1].Description != "New feature or request" {
+		t.Fatalf("unexpected second label: %#v", got[1])
 	}
 }
 
@@ -45,33 +46,33 @@ func TestSyncLabelsParseLabelsYmlHandlesMultilineSpecialCharactersAndMissingFiel
   description: ""
 `)
 
-	labels, err := parseLabelsYml(path)
+	got, err := labels.ParseFile(path)
 	if err != nil {
-		t.Fatalf("parseLabelsYml returned error: %v", err)
+		t.Fatalf("ParseFile returned error: %v", err)
 	}
-	if len(labels) != 2 {
-		t.Fatalf("expected 2 labels, got %d", len(labels))
+	if len(got) != 2 {
+		t.Fatalf("expected 2 labels, got %d", len(got))
 	}
-	if labels[0].Color != "abcdef" {
-		t.Fatalf("expected normalized color, got %q", labels[0].Color)
+	if got[0].Color != "abcdef" {
+		t.Fatalf("expected normalized color, got %q", got[0].Color)
 	}
-	if !strings.Contains(labels[0].Description, "First line: keep punctuation [] {} : # !") || !strings.Contains(labels[0].Description, "Second line with unicode-free symbols -> <= >=") {
-		t.Fatalf("expected multiline description, got %q", labels[0].Description)
+	if !strings.Contains(got[0].Description, "First line: keep punctuation [] {} : # !") || !strings.Contains(got[0].Description, "Second line with unicode-free symbols -> <= >=") {
+		t.Fatalf("expected multiline description, got %q", got[0].Description)
 	}
-	if labels[1].Color != "" || labels[1].Description != "" {
-		t.Fatalf("expected missing fields to stay empty, got %#v", labels[1])
+	if got[1].Color != "" || got[1].Description != "" {
+		t.Fatalf("expected missing fields to stay empty, got %#v", got[1])
 	}
 }
 
 func TestSyncLabelsParseLabelsYmlHandlesEmptyFile(t *testing.T) {
 	path := writeSyncLabelsFixture(t, "")
 
-	labels, err := parseLabelsYml(path)
+	got, err := labels.ParseFile(path)
 	if err != nil {
-		t.Fatalf("parseLabelsYml returned error: %v", err)
+		t.Fatalf("ParseFile returned error: %v", err)
 	}
-	if len(labels) != 0 {
-		t.Fatalf("expected no labels, got %d", len(labels))
+	if len(got) != 0 {
+		t.Fatalf("expected no labels, got %d", len(got))
 	}
 }
 
@@ -81,7 +82,7 @@ func TestSyncLabelsParseLabelsYmlRejectsEmptyName(t *testing.T) {
   description: invalid
 `)
 
-	_, err := parseLabelsYml(path)
+	_, err := labels.ParseFile(path)
 	if err == nil {
 		t.Fatal("expected error for empty name")
 	}
@@ -97,9 +98,9 @@ func TestSyncLabelsParseLabelsYmlPerformance(t *testing.T) {
 `)
 
 	start := time.Now()
-	_, err := parseLabelsYml(path)
+	_, err := labels.ParseFile(path)
 	if err != nil {
-		t.Fatalf("parseLabelsYml returned error: %v", err)
+		t.Fatalf("ParseFile returned error: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed >= 100*time.Millisecond {
 		t.Fatalf("expected parse under 100ms, got %s", elapsed)
