@@ -143,7 +143,7 @@ jobs:
               core.notice(`Enabled auto-merge for PR #${pull_number}`);
             } catch (e) {
               const message = String(e.message || '');
-              if (/draft|merge conflict|changes requested|review|required review|behind|base branch policy|not in clean status|cannot enable auto-merge/i.test(message)) {
+              if (/draft|merge conflict|changes requested|review|required review|behind|base branch policy|not in clean status|cannot enable auto-merge|unstable/i.test(message)) {
                 core.notice(`Human attention: ${message}`);
                 return;
               }
